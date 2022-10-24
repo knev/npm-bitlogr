@@ -1,0 +1,32 @@
+{
+	"name": "bitlogger",
+	"version": "0.0.1",
+	"description": "",
+	"exports": {
+	  "node": {
+		"module": "./dist/bitlogger.es.js",
+		"require": "./dist/bitlogger.cjs.js"
+	  },
+	  "default": "./dist/bitlogger.es.js"
+	},
+	"scripts": {
+	  "build": "rollup --config",
+	  "test": "node tests/LOGR.test.mjs",
+	  "clean": "del dist && echo OK"
+	},
+	"repository": {
+	  "type": "git",
+	  "url": "git+https://..."
+	},
+	"author": "K.Nevelsteen, PhD",
+	"license": "ISC",
+	"bugs": {
+	  "url": "https://.../issues"
+	},
+	"homepage": "https://...#readme",
+	"devDependencies": {
+	  "del-cli": "^5.0.0",
+	  "rollup": "^3.2.3"
+	}
+  }
+  
