@@ -51,6 +51,7 @@ var LOGR_= (function() {
 		get tags() { return _Bint_tags; },
 		set tags(obj) {
 			_Bint_tags= obj;
+			_Bint_toggled= BigInt(0);
 		},
 		// put : function(tag, label) {
 		// 	let name= __name(tag);
