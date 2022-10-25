@@ -1,7 +1,8 @@
 
-import { LOGR as LOGR_ } from '../src/bitlogger.mjs';
+import * as reflector from './reflector.mjs';
+import * as msg_cache from './msg_cache.mjs';
 
-var options= {
+var options_= {
 	logr : {
 		CXNS : 1,
 		MSGE : 1,
@@ -10,56 +11,8 @@ var options= {
 	}
 }
 
-//-------------------------------------------------------------------------------------------------
-
-const REFL= 0b1 << 1;	// reflection
-
-const l_ = {
-	CXNS : 0b1 << 0,	// connections
-	DUPS : 0b1 << 2,	// duplicates
-	MSGE : 0b1 << 3,	// MsgEnv
-}
-
-// LOGR_.put({REFL}, 'FL');
-
-LOGR_.tags= l_;
-console.log('LOGR_.tags', LOGR_.tags);
-
-LOGR_.log(l_.CXNS, 'NOP');
-
-LOGR_.toggled= options.logr;
-console.log('LOGR_.toggled', LOGR_.toggled.toString(2) );
-console.log()
-
-// ----
-
-LOGR_.log(l_.CXNS, 'YES');
-console.log()
-
-LOGR_.log(l_.DUPS, 'NO');
-console.log()
-
-//-------------------------------------------------------------------------------------------------
-
-const ll_= {
-	DEL : 0b1 << 0,		// removed
-	CXNS : 0b1 << 2,	// connections
-}
-
-LOGR_.tags= ll_;
-console.log('LOGR_.tags', LOGR_.tags);
-
-LOGR_.toggled= options.logr;
-console.log('LOGR_.toggled', LOGR_.toggled.toString(2) );
-console.log()
-
-// ----
-
-LOGR_.log(ll_.DEL, 'NO');
-console.log()
-
-LOGR_.log(ll_.CXNS, 'YES');
-console.log()
+reflector.exec(options_);
+msg_cache.exec(options_);
 
 //-------------------------------------------------------------------------------------------------
 
@@ -83,3 +36,29 @@ console.log()
 // console.log ( ignore || v );
 
 //-------------------------------------------------------------------------------------------------
+// https://stackoverflow.com/questions/55611/javascript-private-methods/25172901#25172901
+
+// var MyObject = (function () {
+    
+// 	// Constructor
+// 	function MyObject(foo) {
+// 	  this._foo = foo;
+// 	}
+  
+// 	function privateFun(prefix) {
+// 	  return prefix + this._foo;
+// 	}
+	  
+// 	MyObject.prototype.publicFun = function () {
+// 	  return privateFun.call(this, ">>");
+// 	}
+	  
+// 	return MyObject;
+  
+//   }());
+
+// var myObject = new MyObject("bar");
+// var bar= myObject.publicFun();      // Returns ">>bar"
+// // myObject.privateFun(">>"); // ReferenceError: private is not defined
+
+// console.log(bar);
