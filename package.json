@@ -1,13 +1,13 @@
 {
 	"name": "@knev/bitlogger",
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"description": "",
 	"exports": {
 	  "node": {
-		"module": "./dist/bitlogger.es.js",
+		"module": "./dist/bitlogger.es.mjs",
 		"require": "./dist/bitlogger.cjs.js"
 	  },
-	  "default": "./dist/bitlogger.es.js"
+	  "default": "./dist/bitlogger.es.mjs"
 	},
 	"scripts": {
 	  "build": "rollup --config",
