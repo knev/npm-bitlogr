@@ -1,5 +1,5 @@
 
-import { LOGR as LOGR_, console_logr as console_logr_ } from '../src/bitlogger.mjs';
+import { LOGR as LOGR_ } from '../src/bitlogger.mjs';
 
 var options= {
 	logr : {
@@ -24,6 +24,8 @@ const l_ = {
 
 LOGR_.tags= l_;
 console.log('LOGR_.tags', LOGR_.tags);
+
+LOGR_.log(l_.CXNS, 'NOP');
 
 LOGR_.toggled= options.logr;
 console.log('LOGR_.toggled', LOGR_.toggled.toString(2) );

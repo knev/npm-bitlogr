@@ -13,17 +13,32 @@ function tagsToBigInt_(ref, obj, ignore= false) {
 	}
 	return bigInt;
 }
+
 //-------------------------------------------------------------------------------------------------
 
 function handler_default_(str_output) {
 	console.log(str_output)
 }
 
+//-------------------------------------------------------------------------------------------------
+
 var LOGR_= (function() {
-	let _handler_log= undefined;
+	let _handler_log= handler_default_;
 	let _Bint_tags= BigInt(0);
 	let _Bint_toggled= BigInt(0);
 
+	function containsSubsetOf_empty(Bint_toggled, nr_logged, str_output) {
+		// console.log('NOP')
+	}
+	
+	function containsSubsetOf(nr_logged, str_output) {
+		if (( BigInt(nr_logged) & _Bint_toggled) === BigInt(0))
+			return false;
+	
+		_handler_log(str_output);
+		return true;
+	}
+	
 	return {
 		set handler(fx) {
 			_handler_log= fx;
@@ -40,23 +55,12 @@ var LOGR_= (function() {
 		get toggled() { return _Bint_toggled; },
 		set toggled(obj) {
 			_Bint_toggled= tagsToBigInt_(_Bint_tags, obj);
-			if (! _handler_log)
-				_handler_log= handler_default_;
+			this.log= containsSubsetOf;
 		},
-		log : function(nr_logged, str_output) {
-			if (! _handler_log)
-				return false;
-			
-			let Bint_logged= BigInt(nr_logged)
-			if ((Bint_logged & _Bint_toggled) === BigInt(0))
-				return false;
-
-			_handler_log(str_output);
-			return true;
-		}
+		log : containsSubsetOf_empty
 	}
 })();
 
 //-------------------------------------------------------------------------------------------------
 
-export { LOGR_ as LOGR, handler_default_ as console_logr };
+export { LOGR_ as LOGR };
