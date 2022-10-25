@@ -14,8 +14,10 @@ function tagsToBigInt_(ref, obj, ignore= false) {
 
 //-------------------------------------------------------------------------------------------------
 
-function handler_default_(str_output) {
-	console.log(str_output);
+function handler_default_( /* ... */ ) {
+	// https://stackoverflow.com/questions/18746440/passing-multiple-arguments-to-console-log
+	var args = Array.prototype.slice.call(arguments);
+	console.log.apply(console, args);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -25,15 +27,18 @@ var LOGR_= (function() {
 	let _Bint_tags= BigInt(0);
 	let _Bint_toggled= BigInt(0);
 
-	function containsSubsetOf_empty(Bint_toggled, nr_logged, str_output) {
+	function containsSubsetOf_empty(Bint_toggled, nr_logged, /* ... */ ) {
 		// console.log('NOP')
 	}
 	
-	function containsSubsetOf(nr_logged, str_output) {
+	function containsSubsetOf(nr_logged, /* ... */ ) {
 		if (( BigInt(nr_logged) & _Bint_toggled) === BigInt(0))
 			return false;
 	
-		_handler_log(str_output);
+		var args = Array.prototype.slice.call(arguments);
+		args.shift(); // remove first arg: nr_logged
+		_handler_log.apply(this, args);
+
 		return true;
 	}
 	
