@@ -1,5 +1,5 @@
 {
-	"name": "@knev/bitlogger",
+	"name": "@knev/bitflaglogger",
 	"version": "0.1.0",
 	"description": "",
 	"exports": {
@@ -16,14 +16,14 @@
 	},
 	"repository": {
 	  "type": "git",
-	  "url": "git+https://github.com/knev/npm-bitlogger.git"
+	  "url": "git+https://github.com/knev/npm-bitflaglogger.git.git"
 	},
 	"author": "K.Nevelsteen, PhD",
 	"license": "ISC",
 	"bugs": {
-	  "url": "https://github.com/knev/npm-bitlogger.git/issues"
+	  "url": "https://github.com/knev/npm-bitflaglogger.git/issues"
 	},
-	"homepage": "https://github.com/knev/npm-bitlogger.git#readme",
+	"homepage": "https://github.com/knev/npm-bitflaglogger.git#readme",
 	"devDependencies": {
 	  "del-cli": "^5.0.0",
 	  "rollup": "^3.2.3"
