@@ -1,5 +1,5 @@
 
-import { BitLogr } from '../src/logr.mjs';
+import { BitLogr, l_LL, l_RR } from '../src/logr.mjs';
 
 let LOGR_= new BitLogr();
 
@@ -7,11 +7,19 @@ let LOGR_= new BitLogr();
 
 const REFL= 0b1 << 1;	// reflection
 
+const ll_= {
+	DEL : 0b1 << 0,		// removed
+	MsgCache : 0b1 << 2,	// connections
+}
+
 const l_ = {
 	CXNS : 0b1 << 0,	// connections
 	DUPS : 0b1 << 2,	// duplicates
 	MSGE : 0b1 << 3,	// MsgEnv
+	... l_RR( l_LL(ll_, 8), 4)
 }
+
+console.log(ll_);
 
 // LOGR_.put({REFL}, 'FL');
 

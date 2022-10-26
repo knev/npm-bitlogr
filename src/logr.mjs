@@ -13,6 +13,20 @@ function labelsToBigInt_(ref, obj, ignore= false) {
 	return bigInt;
 }
 
+function l_LL(obj, x) {
+	let obj_new= {}
+	for (var [k,v] of Object.entries(obj))
+		obj_new[k]= v<<x;
+	return obj_new;
+}
+
+function l_RR(obj, x) {
+	let obj_new= {}
+	for (var [k,v] of Object.entries(obj))
+		obj_new[k]= v>>x;
+	return obj_new;
+}
+
 //-------------------------------------------------------------------------------------------------
 
 function handler_default_( /* ... */ ) {
@@ -71,4 +85,4 @@ class BitLogr {
 
 //-------------------------------------------------------------------------------------------------
 
-export { BitLogr };
+export { BitLogr, l_LL, l_RR };
