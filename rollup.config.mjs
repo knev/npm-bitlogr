@@ -1,17 +1,17 @@
 export default [
 	{
-		input: 'src/bitlogger.mjs',
+		input: 'src/logr.mjs',
 		output: {
-			name: "bitlogger",
-			file: 'dist/bitlogger.cjs.js',
+			name: "logr",
+			file: 'dist/logr.cjs.js',
 			format: 'cjs'
 		}
 	},
 	{
-		input: 'src/bitlogger.mjs',
+		input: 'src/logr.mjs',
 		output: {
-			name: "bitlogger",
-			file: 'dist/bitlogger.es.mjs',
+			name: "logr",
+			file: 'dist/logr.es.mjs',
 			format: 'es'
 		}
 	}

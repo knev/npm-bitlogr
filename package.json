@@ -1,29 +1,29 @@
 {
-	"name": "@knev/bitflaglogger",
-	"version": "0.1.0",
+	"name": "@knev/bitlogr",
+	"version": "0.2.0",
 	"description": "",
 	"exports": {
 	  "node": {
-		"module": "./dist/bitlogger.es.mjs",
-		"require": "./dist/bitlogger.cjs.js"
+		"module": "./dist/logr.es.mjs",
+		"require": "./dist/logr.cjs.js"
 	  },
-	  "default": "./dist/bitlogger.es.mjs"
+	  "default": "./dist/logr.es.mjs"
 	},
 	"scripts": {
 	  "build": "rollup --config",
-	  "test": "node tests/LOGR.test.mjs",
+	  "test": "node tests/logr.test.mjs",
 	  "clean": "del dist && echo OK"
 	},
 	"repository": {
 	  "type": "git",
-	  "url": "git+https://github.com/knev/npm-bitflaglogger.git.git"
+	  "url": "git+https://github.com/knev/npm-bitlogr.git"
 	},
 	"author": "K.Nevelsteen, PhD",
 	"license": "ISC",
 	"bugs": {
-	  "url": "https://github.com/knev/npm-bitflaglogger.git/issues"
+	  "url": "https://github.com/knev/npm-bitlogr.git/issues"
 	},
-	"homepage": "https://github.com/knev/npm-bitflaglogger.git#readme",
+	"homepage": "https://github.com/knev/npm-bitlogr.git#readme",
 	"devDependencies": {
 	  "del-cli": "^5.0.0",
 	  "rollup": "^3.2.3"

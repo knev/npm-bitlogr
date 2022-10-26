@@ -1,5 +1,5 @@
 
-import { BitFlagLogger } from '../src/bitlogger.mjs';
+import { BitFlagLogger } from '../src/logr.mjs';
 
 let LOGR_= new BitFlagLogger();
 
