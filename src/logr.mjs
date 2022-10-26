@@ -3,7 +3,7 @@
 const __name = obj => Object.keys(obj)[0];
 // console.log('OUT', __name({variableName}) );
 
-function tagsToBigInt_(ref, obj, ignore= false) {
+function labelsToBigInt_(ref, obj, ignore= false) {
 	let bigInt = BigInt(0);
 	for (const [t,v] of Object.entries(obj)) {
 		if ( ( ignore || v ) && ref[t])
@@ -23,13 +23,13 @@ function handler_default_( /* ... */ ) {
 
 //-------------------------------------------------------------------------------------------------
 	
-class BitFlagLogger {
+class BitLogr {
 	constructor() {
 		this._handler_log= handler_default_;
-		this._Bint_tags= BigInt(0);
+		this._Bint_labels= BigInt(0);
 		this._Bint_toggled= BigInt(0);
 
-		BitFlagLogger.prototype['log']= function (nr_logged, /* ... */ ) {
+		BitLogr.prototype['log']= function (nr_logged, /* ... */ ) {
 			// console.log('NOP')
 		}
 	}
@@ -38,23 +38,23 @@ class BitFlagLogger {
 		this._handler_log= fx;
 	}
 
-	get tags() { return this._Bint_tags; }
-	set tags(obj) {
-		this._Bint_tags= obj;
+	get labels() { return this._Bint_labels; }
+	set labels(obj) {
+		this._Bint_labels= obj;
 		this._Bint_toggled= BigInt(0);
 	}
 
-	// put= function(tag, label) {
-	// 	let name= __name(tag);
-	// 	_tags[name]= tag[name];
-	// 	console.log(_tags);
+	// put= function(label, abbrv) {
+	// 	let name= __name(label);
+	// 	_labels[name]= label[name];
+	// 	console.log(_labels);
 	// }
 
 	get toggled() { return this._Bint_toggled; }
 	set toggled(obj) {
-		this._Bint_toggled= tagsToBigInt_(this._Bint_tags, obj);
+		this._Bint_toggled= labelsToBigInt_(this._Bint_labels, obj);
 
-		BitFlagLogger.prototype['log']= function (nr_logged, /* ... */ ) {
+		BitLogr.prototype['log']= function (nr_logged, /* ... */ ) {
 			if ( (BigInt(nr_logged) & this._Bint_toggled) === BigInt(0))
 				return false;
 		
@@ -71,4 +71,4 @@ class BitFlagLogger {
 
 //-------------------------------------------------------------------------------------------------
 
-export { BitFlagLogger };
+export { BitLogr };

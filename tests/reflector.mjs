@@ -1,7 +1,7 @@
 
-import { BitFlagLogger } from '../src/logr.mjs';
+import { BitLogr } from '../src/logr.mjs';
 
-let LOGR_= new BitFlagLogger();
+let LOGR_= new BitLogr();
 
 //-------------------------------------------------------------------------------------------------
 
