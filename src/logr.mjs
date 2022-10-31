@@ -4,6 +4,7 @@ const __name = obj => Object.keys(obj)[0];
 // console.log('OUT', __name({variableName}) );
 
 function labelsToBigInt_(ref, obj, ignore= false) {
+	console.assert(ref !== BigInt(0), 'no labels initialized');
 	let bigInt = BigInt(0);
 	for (const [t,v] of Object.entries(obj)) {
 		if ( ( ignore || v ) && ref[t])

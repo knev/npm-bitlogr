@@ -10,8 +10,8 @@ const l_= {
 	CXNS : 0b1 << 2,	// connections
 }
 
-LOGR_.tags= l_;
-console.log('LOGR_.tags', LOGR_.tags);
+LOGR_.labels= l_;
+console.log('LOGR_.labels', LOGR_.labels);
 
 //-------------------------------------------------------------------------------------------------
 
@@ -20,7 +20,7 @@ function exec(options) {
 	console.log('LOGR_.toggled', LOGR_.toggled.toString(2) );
 	console.log()
 
-	console.log('LOGR_.tags', LOGR_.tags);
+	console.log('LOGR_.labels', LOGR_.labels);
 
 	LOGR_.log(l_.DEL, 'NO');
 	console.log()

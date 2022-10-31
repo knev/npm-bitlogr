@@ -11,6 +11,7 @@ const ll_= {
 	DEL : 0b1 << 0,		// removed
 	MsgCache : 0b1 << 2,	// connections
 }
+console.log(ll_);
 
 const l_ = {
 	CXNS : 0b1 << 0,	// connections
@@ -19,12 +20,10 @@ const l_ = {
 	... l_RR( l_LL(ll_, 8), 4)
 }
 
-console.log(ll_);
-
 // LOGR_.put({REFL}, 'FL');
 
-LOGR_.tags= l_;
-console.log('LOGR_.tags', LOGR_.tags);
+LOGR_.labels= l_;
+console.log('LOGR_.labels', LOGR_.labels);
 
 LOGR_.log(l_.CXNS, 'NOP');
 
@@ -36,7 +35,7 @@ function exec(options) {
 	console.log('LOGR_.toggled', LOGR_.toggled.toString(2) );
 	console.log()
 
-	console.log('LOGR_.tags', LOGR_.tags);
+	console.log('LOGR_.labels', LOGR_.labels);
 
 	LOGR_.log(l_.CXNS, 'YES');
 	console.log()
