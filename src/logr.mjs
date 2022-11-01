@@ -3,7 +3,7 @@
 const __name = obj => Object.keys(obj)[0];
 // console.log('OUT', __name({variableName}) );
 
-function labelsToBigInt_(ref, obj, ignore= false) {
+function l_toBigInt_(ref, obj, ignore= false) {
 	console.assert(ref !== BigInt(0), 'no labels initialized');
 	let bigInt = BigInt(0);
 	for (const [t,v] of Object.entries(obj)) {
@@ -14,14 +14,14 @@ function labelsToBigInt_(ref, obj, ignore= false) {
 	return bigInt;
 }
 
-function l_LL(obj, x) {
+function l_LL_(obj, x) {
 	let obj_new= {}
 	for (var [k,v] of Object.entries(obj))
 		obj_new[k]= v<<x;
 	return obj_new;
 }
 
-function l_RR(obj, x) {
+function l_RR_(obj, x) {
 	let obj_new= {}
 	for (var [k,v] of Object.entries(obj))
 		obj_new[k]= v>>x;
@@ -67,7 +67,7 @@ class BitLogr {
 
 	get toggled() { return this._Bint_toggled; }
 	set toggled(obj) {
-		this._Bint_toggled= labelsToBigInt_(this._Bint_labels, obj);
+		this._Bint_toggled= l_toBigInt_(this._Bint_labels, obj);
 
 		BitLogr.prototype['log']= function (nr_logged, /* ... */ ) {
 			if ( (BigInt(nr_logged) & this._Bint_toggled) === BigInt(0))
@@ -86,4 +86,8 @@ class BitLogr {
 
 //-------------------------------------------------------------------------------------------------
 
-export { BitLogr, l_LL, l_RR };
+export { 
+	BitLogr, 
+	l_LL_ as l_LL, 
+	l_RR_ as l_RR,
+};
