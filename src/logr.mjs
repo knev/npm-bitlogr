@@ -6,9 +6,9 @@ const __name = obj => Object.keys(obj)[0];
 function l_toBigInt_(ref, obj, ignore= false) {
 	console.assert(ref !== BigInt(0), 'no labels initialized');
 	let bigInt = BigInt(0);
-	for (const [t,v] of Object.entries(obj)) {
-		if ( ( ignore || v ) && ref[t])
-			bigInt|= BigInt( ref[t] );			
+	for (const [k,v] of Object.entries(obj)) {
+		if ( ( ignore || v ) && ref[k])
+			bigInt|= BigInt( ref[k] );			
 		// console.log('0b'+ bigInt.toString(2) );
 	}
 	return bigInt;
