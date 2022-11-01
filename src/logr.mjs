@@ -69,6 +69,11 @@ class BitLogr {
 	set toggled(obj) {
 		this._Bint_toggled= l_toBigInt_(this._Bint_labels, obj);
 
+		if (this._Bint_toggled === BigInt(0)) {
+			console.log('adlkjasdlfk');
+			return;
+		}
+
 		BitLogr.prototype['log']= function (nr_logged, /* ... */ ) {
 			if ( (BigInt(nr_logged) & this._Bint_toggled) === BigInt(0))
 				return false;
