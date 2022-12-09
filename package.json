@@ -3,6 +3,7 @@
 	"version": "0.2.4",
 	"description": "",
 	"main" : "./dist/logr.es.mjs",
+	"types": "./dist/logr.d.ts",
 	"exports": {
 	  "node": {
 		"module": "./dist/logr.es.mjs",
@@ -27,7 +28,8 @@
 	"homepage": "https://github.com/knev/npm-bitlogr.git#readme",
 	"devDependencies": {
 	  "del-cli": "^5.0.0",
-	  "rollup": "^3.2.3"
+		"rollup": "^3.2.3",
+		"rollup-plugin-dts": "^5.0.0"
 	}
   }
   
