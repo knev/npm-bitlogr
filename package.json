@@ -2,34 +2,33 @@
 	"name": "@knev/bitlogr",
 	"version": "0.2.4",
 	"description": "",
-	"main" : "./dist/logr.es.mjs",
+	"main": "./dist/logr.es.mjs",
 	"types": "./dist/logr.d.ts",
 	"exports": {
-	  "node": {
-		"module": "./dist/logr.es.mjs",
-		"require": "./dist/logr.cjs.js"
-	  },
-	  "default": "./dist/logr.es.mjs"
+		"node": {
+			"module": "./dist/logr.es.mjs",
+			"require": "./dist/logr.cjs.js"
+		},
+		"default": "./dist/logr.es.mjs"
 	},
 	"scripts": {
-	  "build": "rollup --config",
-	  "test": "node tests/logr.test.mjs",
-	  "clean": "del dist && echo OK"
+		"build": "rollup --config",
+		"test": "node tests/logr.test.mjs",
+		"clean": "del dist && echo OK"
 	},
 	"repository": {
-	  "type": "git",
-	  "url": "git+https://github.com/knev/npm-bitlogr.git"
+		"type": "git",
+		"url": "git+https://github.com/knev/npm-bitlogr.git"
 	},
 	"author": "K.Nevelsteen, PhD",
 	"license": "ISC",
 	"bugs": {
-	  "url": "https://github.com/knev/npm-bitlogr.git/issues"
+		"url": "https://github.com/knev/npm-bitlogr.git/issues"
 	},
 	"homepage": "https://github.com/knev/npm-bitlogr.git#readme",
 	"devDependencies": {
-	  "del-cli": "^5.0.0",
+		"del-cli": "^5.0.0",
 		"rollup": "^3.2.3",
 		"rollup-plugin-dts": "^5.0.0"
 	}
-  }
-  
+}
