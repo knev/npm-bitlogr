@@ -1,6 +1,6 @@
 {
 	"name": "@knev/bitlogr",
-	"version": "0.2.4",
+	"version": "0.2.10",
 	"description": "",
 	"main": "./dist/logr.es.mjs",
 	"types": "./dist/logr.d.ts",
