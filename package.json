@@ -1,6 +1,6 @@
 {
 	"name": "@knev/bitlogr",
-	"version": "0.2.11",
+	"version": "0.2.12",
 	"description": "",
 	"main": "./dist/logr.es.mjs",
 	"exports": {
@@ -27,7 +27,6 @@
 	"homepage": "https://github.com/knev/npm-bitlogr.git#readme",
 	"devDependencies": {
 		"del-cli": "^5.0.0",
-		"rollup": "^3.2.3",
-		"rollup-plugin-dts": "^5.0.0"
+		"rollup": "^3.2.3"
 	}
 }
