@@ -1,9 +1,8 @@
 {
 	"name": "@knev/bitlogr",
-	"version": "0.2.10",
+	"version": "0.2.11",
 	"description": "",
 	"main": "./dist/logr.es.mjs",
-	"types": "./dist/logr.d.ts",
 	"exports": {
 		"node": {
 			"module": "./dist/logr.es.mjs",
