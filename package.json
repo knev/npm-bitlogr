@@ -13,7 +13,7 @@
 	"scripts": {
 		"build": "rollup --config",
 		"test": "jasmine",
-		"clean": "del dist && echo OK"
+		"clean": "del-cli dist && echo OK"
 	},
 	"repository": {
 		"type": "git",
