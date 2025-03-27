@@ -14,15 +14,15 @@ function l_toBigInt_(ref, obj, ignore= false) {
 }
 
 function l_LL_(obj, x) {
-	let obj_new= {};
-	for (var [k,v] of Object.entries(obj))
+	const obj_new= {};
+	for (const [k,v] of Object.entries(obj))
 		obj_new[k]= v<<x;
 	return obj_new;
 }
 
 function l_RR_(obj, x) {
-	let obj_new= {};
-	for (var [k,v] of Object.entries(obj))
+	const obj_new= {};
+	for (const [k,v] of Object.entries(obj))
 		obj_new[k]= v>>x;
 	return obj_new;
 }
@@ -68,10 +68,8 @@ class BitLogr {
 	set toggled(obj) {
 		this._Bint_toggled= l_toBigInt_(this._Bint_labels, obj);
 
-		if (this._Bint_toggled === BigInt(0)) {
-			console.log('adlkjasdlfk');
+		if (this._Bint_toggled === BigInt(0))
 			return;
-		}
 
 		BitLogr.prototype['log']= function (nr_logged, /* ... */ ) {
 			if ( (BigInt(nr_logged) & this._Bint_toggled) === BigInt(0))
