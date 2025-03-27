@@ -12,7 +12,7 @@ describe("BitLogr and Helper Functions", () => {
 		LOGR_ = new BitLogr();
 		LOGR_.labels= l_;
 		// Spy on console.log before each test
-		spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
+		spyOn(console, "log");
 	});
 
 	afterEach(() => {
@@ -79,7 +79,9 @@ describe("BitLogr and Helper Functions", () => {
 			expect(typeof BitLogr.prototype.log).toBe("function");
 			expect(typeof LOGR._handler_log).toBe("function");
 
+			spyOn(console, "assert");
 			LOGR.toggled = {};
+			expect(console.assert).toHaveBeenCalledWith(false, 'no labels initialized')
 			expect(LOGR.toggled).toBe(0n);		
 		});
 
