@@ -12,7 +12,7 @@
 	},
 	"scripts": {
 		"build": "rollup --config",
-		"test": "node tests/logr.test.mjs",
+		"test": "jasmine",
 		"clean": "del dist && echo OK"
 	},
 	"repository": {
@@ -27,6 +27,7 @@
 	"homepage": "https://github.com/knev/npm-bitlogr.git#readme",
 	"devDependencies": {
 		"del-cli": "^5.0.0",
+		"jasmine": "^5.6.0",
 		"rollup": "^3.2.3"
 	}
 }
