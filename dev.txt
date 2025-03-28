@@ -2,3 +2,6 @@
 - NOP function when when flags are not toggled
 - no label dependency 
 - each unit can ignore, inherit, overwrite or rename sub unit labels
+- can specify a custom logging handler
+
+
