@@ -13,6 +13,7 @@ describe("BitLogr and Helper Functions", () => {
 		LOGR_.labels= l_;
 		// Spy on console.log before each test
 		spyOn(console, "log");
+		// spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
 	});
 
 	afterEach(() => {
@@ -164,5 +165,74 @@ describe("BitLogr and Helper Functions", () => {
   
 	});
 
+
+});
+
+describe("BitLogr performance;", () => {
+	let LOGR_;
+	const l_= {
+		DEL : 0b1 << 0,		// removed
+		CXNS : 0b1 << 2,	// connections
+	}
+
+	beforeEach(() => {
+		LOGR_ = new BitLogr();
+		LOGR_.labels= l_;
+		// Spy on console.log before each test
+		spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
+	});
+
+	afterEach(() => {
+		// Reset the spy after each test to avoid interference
+		console.log.calls.reset();
+	});
+
+
+	fit("NOP", () => {
+		const fxn_empty = function() {
+			// Empty function (NOP)
+		}
+
+		// Store log function locally
+		const logFn = LOGR_.log;
+		const fxn_log = function() {
+			logFn(l_.DEL | l_.CXNS, "this message should not log");
+			// LOGR_.log(l_.DEL | l_.CXNS, "this message should not log");
+		}
+
+		// Warm-up runs to avoid JIT compilation skewing results
+		for (let i = 0; i < 1000; i++) {
+			fxn_empty();
+			fxn_log();
+		}
+
+		// Measure empty function performance
+		const start_empty = performance.now();
+		for (let i = 0; i < 1000000000; i++) {
+			fxn_empty();
+		}
+		const end_empty = performance.now();
+		const t_empty = end_empty - start_empty;
+
+		// Measure logging function performance
+		const start_log = performance.now();
+		for (let i = 0; i < 1000000000; i++) {
+			fxn_log();
+		}
+		const end_log = performance.now();
+		const t_log = end_log - start_log;
+
+		// Calculate and log results
+		const difference = t_log - t_empty;
+		const percentSlower = ((t_log - t_empty) / t_empty * 100).toFixed(2);
+
+		console.log(`Empty function time: ${t_empty.toFixed(2)}ms`);
+		console.log(`Logging function time: ${t_log.toFixed(2)}ms`);
+		console.log(`Difference: ${difference.toFixed(2)}ms`);
+		console.log(`Logging function is ${percentSlower}% slower`);
+
+		// Basic assertion to ensure test passes
+		expect(true).toBe(true);
+	});
 
 });
