@@ -43,9 +43,9 @@ class BitLogr {
 		this._Bint_labels= BigInt(0);
 		this._Bint_toggled= BigInt(0);
 
-		BitLogr.prototype['log']= function (nr_logged, /* ... */ ) {
-			// console.log('NOP')
-		};
+        // Define a standalone NOP function
+        this._nopLog = () => {};
+        this._log_fxn = this._nopLog; // Default to standalone NOP
 	}
 
 	set handler(fx) {
@@ -64,14 +64,17 @@ class BitLogr {
 	// 	console.log(_labels);
 	// }
 
-	get toggled() { return this._Bint_toggled; }
-	set toggled(obj) {
+	getLogger(obj) {
+		if (obj === undefined)
+			return this._log_fxn.bind(this);
+
 		this._Bint_toggled= l_toBigInt_(this._Bint_labels, obj);
 
-		if (this._Bint_toggled === BigInt(0))
-			return;
-
-		BitLogr.prototype['log']= function (nr_logged, /* ... */ ) {
+		if (this._Bint_toggled === BigInt(0)) {
+            this._log_fxn = () => {}; // Reset to lightweight NOP
+			return this._log_fxn.bind(this);
+		}
+		this._log_fxn = function(nr_logged, /* ... */) {
 			if ( (BigInt(nr_logged) & this._Bint_toggled) === BigInt(0))
 				return false;
 		
@@ -81,9 +84,11 @@ class BitLogr {
 	
 			return true;
 		};
+		return this._log_fxn.bind(this);
 	}
 
-	// log= function (nr_logged, /* ... */ ) {}
+	get toggled() { return this._Bint_toggled; }
+
 }
 
 exports.BitLogr = BitLogr;
