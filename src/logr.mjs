@@ -68,10 +68,13 @@ class BitLogr {
 	get toggled() { return this._Bint_toggled; }
 	set toggled(obj) {
 		this._Bint_toggled= l_toBigInt_(this._Bint_labels, obj);
+		this._update_fxn_log
+	}
 
-        if (this._Bint_toggled === BigInt(0)) {
+	_update_fxn_log() {
+		if (this._Bint_toggled === BigInt(0)) {
             this.log = () => false; // Reset to lightweight NOP
-        } 
+		} 
 		else {
             const self = this; // Avoid repeated 'this' lookups
             this.log = function(nr_logged, /* ... */) {
@@ -87,7 +90,6 @@ class BitLogr {
 		}
 	}
 
-	// log= function (nr_logged, /* ... */ ) {}
 }
 
 //-------------------------------------------------------------------------------------------------
