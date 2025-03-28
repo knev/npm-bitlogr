@@ -45,8 +45,8 @@ class BitLogr {
 		this._Bint_toggled= BigInt(0);
 
         // Define a standalone NOP function
-        this._nopLog = () => false;
-        this.log = this._nopLog; // Default to standalone NOP
+        this._nopLog = () => {};
+        this._log_fxn = this._nopLog; // Default to standalone NOP
 	}
 
 	set handler(fx) {
@@ -65,30 +65,32 @@ class BitLogr {
 	// 	console.log(_labels);
 	// }
 
-	get toggled() { return this._Bint_toggled; }
-	set toggled(obj) {
+	getLogger(obj) {
+		if (obj === undefined)
+			return this._log_fxn.bind(this);
+
 		this._Bint_toggled= l_toBigInt_(this._Bint_labels, obj);
-		this._update_fxn_log
+
+		if (this._Bint_toggled === BigInt(0)) {
+            this._log_fxn = () => {}; // Reset to lightweight NOP
+			return this._log_fxn.bind(this);
+		}
+
+		const self = this; // Avoid repeated 'this' lookups
+		this._log_fxn = function(nr_logged, /* ... */) {
+			if ( (BigInt(nr_logged) & this._Bint_toggled) === BigInt(0))
+				return false;
+		
+			var args = Array.prototype.slice.call(arguments);
+			args.shift(); // remove first arg: nr_logged
+			this._handler_log.apply(this, args);
+	
+			return true;
+		}
+		return this._log_fxn.bind(this);
 	}
 
-	_update_fxn_log() {
-		if (this._Bint_toggled === BigInt(0)) {
-            this.log = () => false; // Reset to lightweight NOP
-		} 
-		else {
-            const self = this; // Avoid repeated 'this' lookups
-            this.log = function(nr_logged, /* ... */) {
-				if ( (BigInt(nr_logged) & this._Bint_toggled) === BigInt(0))
-					return false;
-			
-				var args = Array.prototype.slice.call(arguments);
-				args.shift(); // remove first arg: nr_logged
-				this._handler_log.apply(this, args);
-		
-				return true;
-			}
-		}
-	}
+	get toggled() { return this._Bint_toggled; }
 
 }
 
