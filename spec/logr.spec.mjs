@@ -1,5 +1,5 @@
 
-import { LOGR, l_array, l_concat, l_concat_array, l_LL, l_RR } from '../src/logr.mjs';
+import { LOGR, l_array, l_concat, l_concat_array, l_merge, l_LL, l_RR } from '../src/logr.mjs';
 
 describe("LOGR and Helper Functions", () => {
 	let LOGR_;
@@ -183,6 +183,103 @@ describe("LOGR and Helper Functions", () => {
 					READ: 0b1 << 2,  // 4
 					WRITE: 0b1 << 3  // 8
 				});
+			});
+
+		});
+
+		describe('l_merge', () => {
+			it('should merge non-overlapping interspersed label sets', () => {
+				const l1 = { A: 0b1 << 3, B: 0b1 << 1 }; // A: 8, B: 2
+				const l2 = { C: 0b1 << 0, D: 0b1 << 4 }; // C: 1, D: 16
+				const l_merged_ = l_merge(l1, l2);
+				
+				expect(l_merged_).toEqual({
+					A: 0b1 << 3,  // 8
+					B: 0b1 << 1,  // 2
+					C: 0b1 << 0,  // 1
+					D: 0b1 << 4   // 16
+				});
+			});
+
+			it('should handle same keys with same values', () => {
+				const l1 = { A: 0b1 << 3, B: 0b1 << 1 }; // A: 8, B: 2
+				const l2 = { A: 0b1 << 3, C: 0b1 << 0 }; // A: 8 (same), C: 1
+				const l_merged_ = l_merge(l1, l2);
+				
+				expect(l_merged_).toEqual({
+					A: 0b1 << 3,  // 8 (from both, same value)
+					B: 0b1 << 1,  // 2
+					C: 0b1 << 0   // 1
+				});
+			});
+
+			it('should shift values for different keys with same value', () => {
+				const l1 = { A: 0b1 << 1, B: 0b1 << 4 }; // A: 2, B: 16
+				const l2 = { C: 0b1 << 1, D: 0b1 << 3 }; // C: 2 (conflicts with A), D: 8
+				const l_merged_ = l_merge(l1, l2);
+				
+				expect(l_merged_).toEqual({
+					A: 0b1 << 1,  // 2 (from l1)
+					B: 0b1 << 4,  // 16
+					C: 0b1 << 5,  // 32 (C shifted from 2)
+					D: 0b1 << 3   // 8
+				});
+			});
+
+			it('should handle multiple interspersed values with shifts', () => {
+				const l1 = { 
+					A: 0b1 << 3,  // 8
+					B: 0b1 << 1,  // 2
+					C: 0b1 << 5   // 32
+				};
+				const l2 = { 
+					D: 0b1 << 1,  // 2 (conflicts with B)
+					E: 0b1 << 3,  // 8 (conflicts with A)
+					F: 0b1 << 4   // 16
+				};
+				const l_merged_ = l_merge(l1, l2);
+				
+				expect(l_merged_).toEqual({
+					A: 0b1 << 3,  // 8
+					B: 0b1 << 1,  // 2
+					C: 0b1 << 5,  // 32
+					D: 0b1 << 6,  // 64 (D shifted from 2)
+					E: 0b1 << 7,  // 128 (E shifted from 8)
+					F: 0b1 << 4   // 16
+				});
+			});
+
+			it('should handle sparse interspersed values', () => {
+				const l1 = { 
+					X: 0b1 << 0,  // 1
+					Y: 0b1 << 10, // 1024
+					Z: 0b1 << 5   // 32
+				};
+				const l2 = { 
+					W: 0b1 << 0,  // 1 (conflicts with X)
+					V: 0b1 << 5,  // 32 (conflicts with Z)
+					U: 0b1 << 8   // 256
+				};
+				const l_merged_ = l_merge(l1, l2);
+				
+				expect(l_merged_).toEqual({
+					X: 0b1 << 0,   // 1
+					Y: 0b1 << 10,  // 1024
+					Z: 0b1 << 5,   // 32
+					W: 0b1 << 11,  // 2048 (W shifted from 1)
+					V: 0b1 << 12,  // 4096 (V shifted from 32)
+					U: 0b1 << 8    // 256
+				});
+			});
+
+			it('should throw error for same keys with different values', () => {
+				spyOn(console, "assert");
+				const l1 = { A: 0b1 << 3 }; // A: 8
+				const l2 = { A: 0b1 << 4 }; // A: 16 (different value)
+				l_merge(l1, l2);
+				expect(console.assert).toHaveBeenCalledWith(false, 
+					"Key 'A' has conflicting values: 8 (obj_labels1) vs 16 (obj_labels2)"
+				)
 			});
 
 		});

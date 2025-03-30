@@ -49,6 +49,37 @@ function l_concat_array_(obj_labels, arr_labels) {
     return l_concat_(obj_labels, arr_labels_new);
 }
 
+function l_merge_(obj_labels1, obj_labels2) {
+    const result = { ...obj_labels1 }; // Start with first set unchanged
+    const set_values = new Set(Object.values(obj_labels1)); // Track all used bit values
+    
+    // Find the highest bit position to start shifting from if needed
+    const value_highest = Math.max(0, ...set_values);
+    let next_shift = value_highest ? Math.floor(Math.log2(value_highest)) + 1 : 0;
+
+    // Process second set
+    for (const [key, value] of Object.entries(obj_labels2)) {
+        if (key in result) {
+            // Same key: Values must match
+            console.assert(
+                result[key] === value,
+                `Key '${key}' has conflicting values: ${result[key]} (obj_labels1) vs ${value} (obj_labels2)`
+            );
+            // No action needed if values match, already in result
+        } else {
+            // New key: Add if value is unique, otherwise shift
+            let value_new = value;
+            while (set_values.has(value_new)) {
+                value_new = 1 << next_shift++;
+            }
+            result[key] = value_new;
+            set_values.add(value_new);
+        }
+    }
+    
+    return Object.freeze(result);
+}
+
 function l_LL_(obj, x) {
 	const obj_new= {}
 	for (const [k,v] of Object.entries(obj))
@@ -136,6 +167,7 @@ export {
 	l_array_ as l_array,
 	l_concat_ as l_concat,
 	l_concat_array_  as l_concat_array,
+	l_merge_ as l_merge,
 	l_LL_ as l_LL, 
 	l_RR_ as l_RR,
 };
