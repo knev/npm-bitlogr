@@ -1,5 +1,5 @@
 
-import { LOGR, l_array, l_merge, l_LL, l_RR } from '../src/logr.mjs';
+import { LOGR, l_array, l_concat, l_concat_array, l_LL, l_RR } from '../src/logr.mjs';
 
 describe("LOGR and Helper Functions", () => {
 	let LOGR_;
@@ -28,62 +28,62 @@ describe("LOGR and Helper Functions", () => {
 
 		describe('l_array', () => {
 			it('should assign correct bit values sequentially', () => {
-				const flags = l_array(['DEL', 'CXNS', 'ACTIVE']);
+				const l_ = l_array(['DEL', 'CXNS', 'ACTIVE']);
 				
-				expect(flags.DEL).toBe(1);    // 2⁰
-				expect(flags.CXNS).toBe(2);   // 2¹
-				expect(flags.ACTIVE).toBe(4); // 2²
+				expect(l_.DEL).toBe(1);    // 2⁰
+				expect(l_.CXNS).toBe(2);   // 2¹
+				expect(l_.ACTIVE).toBe(4); // 2²
 			});
 		
 			it('should work with a single label', () => {
-				const flags = l_array(['ONLY']);
-				expect(flags.ONLY).toBe(1);
-				expect(Object.keys(flags).length).toBe(1);
+				const l_ = l_array(['ONLY']);
+				expect(l_.ONLY).toBe(1);
+				expect(Object.keys(l_).length).toBe(1);
 			});
 		
 			it('should create an empty object with empty array', () => {
-				const flags = l_array([]);
-				expect(flags).toEqual({});
-				expect(Object.keys(flags).length).toBe(0);
+				const l_ = l_array([]);
+				expect(l_).toEqual({});
+				expect(Object.keys(l_).length).toBe(0);
 			});
 		
 			it('should return a frozen object', () => {
-				const flags = l_array(['DEL', 'CXNS']);
+				const l_ = l_array(['DEL', 'CXNS']);
 				
-				expect(Object.isFrozen(flags)).toBe(true);
+				expect(Object.isFrozen(l_)).toBe(true);
         
 				// In strict mode, attempting to modify a frozen object throws
 				expect(() => {
-					flags.DEL = 100;
+					l_.DEL = 100;
 				}).toThrowError(TypeError, /Cannot assign to read only property 'DEL'/);
 				
 				// Verify the value remains unchanged
-				expect(flags.DEL).toBe(1);
+				expect(l_.DEL).toBe(1);
 			});
 		
 			it('should support bitwise operations', () => {
-				const flags = l_array(['READ', 'WRITE']);
-				const combined = flags.READ | flags.WRITE; // 1 | 2 = 3
+				const l_ = l_array(['READ', 'WRITE']);
+				const combined = l_.READ | l_.WRITE; // 1 | 2 = 3
 				
 				expect(combined).toBe(3);
-				expect((combined & flags.READ) !== 0).toBe(true);
-				expect((combined & flags.WRITE) !== 0).toBe(true);
+				expect((combined & l_.READ) !== 0).toBe(true);
+				expect((combined & l_.WRITE) !== 0).toBe(true);
 			});
 		
 			it('should handle different label sets independently', () => {
-				const flags1 = l_array(['A', 'B']);
-				const flags2 = l_array(['X', 'Y', 'Z']);
+				const l1_ = l_array(['A', 'B']);
+				const l2_ = l_array(['X', 'Y', 'Z']);
 				
-				expect(flags1.A).toBe(1);
-				expect(flags1.B).toBe(2);
-				expect(flags2.X).toBe(1);
-				expect(flags2.Y).toBe(2);
-				expect(flags2.Z).toBe(4);
+				expect(l1_.A).toBe(1);
+				expect(l1_.B).toBe(2);
+				expect(l2_.X).toBe(1);
+				expect(l2_.Y).toBe(2);
+				expect(l2_.Z).toBe(4);
 			});
 
 			it('should create flags starting at specified index', () => {
-				const flags = l_array(['DEL', 'CXNS'], 0b1 << 2);
-				expect(flags).toEqual({
+				const l_ = l_array(['DEL', 'CXNS'], 0b1 << 2);
+				expect(l_).toEqual({
 					DEL: 0b1 << 2,  // 4
 					CXNS: 0b1 << 3  // 8
 				});
@@ -91,7 +91,7 @@ describe("LOGR and Helper Functions", () => {
 		
 		});
 
-		describe('l_merge', () => {
+		describe('l_concat', () => {
 			const l_ = l_array(['DEL', 'CXNS']); // DEL: 1, CXNS: 2
 			const l_AB = {
 				A: 0b1 << 3,  // 8
@@ -99,9 +99,9 @@ describe("LOGR and Helper Functions", () => {
 			};
 		
 			it('should merge flag sets while preserving original values', () => {
-				const merged = l_merge(l_, l_AB);
+				const l_concatd_ = l_concat(l_, l_AB);
 				
-				expect(merged).toEqual({
+				expect(l_concatd_).toEqual({
 					DEL: 0b1 << 0,  // 1 (from l_)
 					CXNS: 0b1 << 1, // 2 (from l_)
 					A: 0b1 << 3,    // 8 (from l_AB, unchanged)
@@ -110,11 +110,79 @@ describe("LOGR and Helper Functions", () => {
 			});
 		
 			it('values when keys overlap', () => {
-				const set1 = l_array(['A'], 0b1 << 3); // A: 8
-				const set2 = l_array(['A'], 0b1 << 1); // A: 2
-				const merged = l_merge(set1, set2);
+				const l1_ = l_array(['A'], 0b1 << 3); // A: 8
+				const l2_ = l_array(['A'], 0b1 << 1); // A: 2
+				const l_concatd_ = l_concat(l1_, l2_);
 				
-				expect(merged.A).toBe(0b1 << 3); // 8 (first set wins)
+				expect(l_concatd_.A).toBe(0b1 << 3); // 8 (first set wins)
+			});
+
+		});
+
+		describe('l_concat_array', () => {
+			it('should add new labels after existing ones', () => {
+				const l_ = l_array(['DEL', 'CXNS']); // DEL: 1, CXNS: 2
+				const l_concatd_ = l_concat_array(l_, ['READ', 'WRITE']);
+				
+				expect(l_concatd_).toEqual({
+					DEL: 0b1 << 0,   // 1
+					CXNS: 0b1 << 1,  // 2
+					READ: 0b1 << 2,  // 4
+					WRITE: 0b1 << 3  // 8
+				});
+			});
+		
+			it('should preserve higher existing values', () => {
+				const l_AB_ = { A: 0b1 << 3, B: 0b1 << 5 }; // A: 8, B: 32
+				const l_concatd_ = l_concat_array(l_AB_, ['X', 'Y']);
+				
+				expect(l_concatd_).toEqual({
+					A: 0b1 << 3,    // 8
+					B: 0b1 << 5,    // 32
+					X: 0b1 << 6,    // 64
+					Y: 0b1 << 7     // 128
+				});
+			});
+		
+			it('should work with empty existing set', () => {
+				const l_concatd_ = l_concat_array({}, ['DEL', 'CXNS']);
+				
+				expect(l_concatd_).toEqual({
+					DEL: 0b1 << 0,  // 1
+					CXNS: 0b1 << 1  // 2
+				});
+			});
+		
+			it('should handle single new label', () => {
+				const l_ = l_array(['DEL']); // DEL: 1
+				const l_concatd_ = l_concat_array(l_, ['NEXT']);
+				
+				expect(l_concatd_).toEqual({
+					DEL: 0b1 << 0,  // 1
+					NEXT: 0b1 << 1  // 2
+				});
+			});
+		
+			it('should preserve original values with no overlap', () => {
+				const l_ = l_array(['DEL', 'CXNS'], 0b1 << 2); // DEL: 4, CXNS: 8
+				const l_concatd_ = l_concat_array(l_, ['READ', 'WRITE']);
+				
+				expect(l_concatd_).toEqual({
+					DEL: 0b1 << 2,   // 4
+					CXNS: 0b1 << 3,  // 8
+					READ: 0b1 << 4,  // 16
+					WRITE: 0b1 << 5  // 32
+				});
+			});
+
+			it('direct concat of arrays', () => {
+				const l_concatd_ = l_concat_array(l_array(['DEL', 'CXNS']), ['READ', 'WRITE']);
+				expect(l_concatd_).toEqual({
+					DEL: 0b1 << 0,   // 1
+					CXNS: 0b1 << 1,  // 2
+					READ: 0b1 << 2,  // 4
+					WRITE: 0b1 << 3  // 8
+				});
 			});
 
 		});

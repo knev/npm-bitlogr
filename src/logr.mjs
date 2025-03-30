@@ -14,23 +14,39 @@ function l_toBigInt_(ref, obj, ignore= false) {
 	return bigInt;
 }
 
-function l_array_(labels, start = 1) {
-    return Object.freeze(labels.reduce((acc, key, index) => {
+//-------------------------------------------------------------------------------------------------
+
+function l_length_(obj_labels) {
+    const labels = Object.values(obj_labels);
+    if (labels.length === 0) 
+		return 1; // Empty object case, start at 1
+
+    const value_max = Math.max(...labels);
+    const bit_highest = Math.floor(Math.log2(value_max));
+    return 1 << (bit_highest + 1);
+}
+
+function l_array_(arr_labels, start = 1) {
+    return Object.freeze(arr_labels.reduce((acc, key, index) => {
         acc[key] = start << index;
         return acc;
     }, {}));
 }
 
-function l_merge_(...label_sets) {
+function l_concat_(...objs_labels) {
     const result = {};
-    for (const set of label_sets) {
-        for (const [key, value] of Object.entries(set)) {
-            if (!(key in result)) {
+    for (const obj_labels of objs_labels)
+        for (const [key, value] of Object.entries(obj_labels))
+            if (!(key in result))
                 result[key] = value;
-            }
-        }
-    }
-    return Object.freeze(result);
+
+	return Object.freeze(result);
+}
+
+function l_concat_array_(obj_labels, arr_labels) {
+    const len = l_length_(obj_labels);
+    const arr_labels_new = l_array_(arr_labels, len);
+    return l_concat_(obj_labels, arr_labels_new);
 }
 
 function l_LL_(obj, x) {
@@ -118,7 +134,8 @@ class LOGR {
 export { 
 	LOGR, 
 	l_array_ as l_array,
-	l_merge_ as l_merge,
+	l_concat_ as l_concat,
+	l_concat_array_  as l_concat_array,
 	l_LL_ as l_LL, 
 	l_RR_ as l_RR,
 };
