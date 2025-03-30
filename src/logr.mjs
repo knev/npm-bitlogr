@@ -14,6 +14,13 @@ function l_toBigInt_(ref, obj, ignore= false) {
 	return bigInt;
 }
 
+function l_array_(labels) {
+    return Object.freeze(labels.reduce((acc, key, index) => {
+        acc[key] = 1 << index;
+        return acc;
+    }, {}));	
+}
+
 function l_LL_(obj, x) {
 	const obj_new= {}
 	for (const [k,v] of Object.entries(obj))
@@ -98,6 +105,7 @@ class LOGR {
 
 export { 
 	LOGR, 
+	l_array_ as l_array,
 	l_LL_ as l_LL, 
 	l_RR_ as l_RR,
 };

@@ -1,5 +1,5 @@
 
-import { LOGR, l_LL, l_RR } from '../src/logr.mjs';
+import { LOGR, l_LL, l_RR, l_array } from '../src/logr.mjs';
 
 describe("LOGR and Helper Functions", () => {
 	let LOGR_;
@@ -24,6 +24,62 @@ describe("LOGR and Helper Functions", () => {
 		afterEach(() => {
 			// Reset the spy after each test to avoid interference
 			console.log.calls.reset();
+		});
+
+		describe('l_array', () => {
+			it('should assign correct bit values sequentially', () => {
+				const flags = l_array(['DEL', 'CXNS', 'ACTIVE']);
+				
+				expect(flags.DEL).toBe(1);    // 2⁰
+				expect(flags.CXNS).toBe(2);   // 2¹
+				expect(flags.ACTIVE).toBe(4); // 2²
+			});
+		
+			it('should work with a single label', () => {
+				const flags = l_array(['ONLY']);
+				expect(flags.ONLY).toBe(1);
+				expect(Object.keys(flags).length).toBe(1);
+			});
+		
+			it('should create an empty object with empty array', () => {
+				const flags = l_array([]);
+				expect(flags).toEqual({});
+				expect(Object.keys(flags).length).toBe(0);
+			});
+		
+			it('should return a frozen object', () => {
+				const flags = l_array(['DEL', 'CXNS']);
+				
+				expect(Object.isFrozen(flags)).toBe(true);
+        
+				// In strict mode, attempting to modify a frozen object throws
+				expect(() => {
+					flags.DEL = 100;
+				}).toThrowError(TypeError, /Cannot assign to read only property 'DEL'/);
+				
+				// Verify the value remains unchanged
+				expect(flags.DEL).toBe(1);
+			});
+		
+			it('should support bitwise operations', () => {
+				const flags = l_array(['READ', 'WRITE']);
+				const combined = flags.READ | flags.WRITE; // 1 | 2 = 3
+				
+				expect(combined).toBe(3);
+				expect((combined & flags.READ) !== 0).toBe(true);
+				expect((combined & flags.WRITE) !== 0).toBe(true);
+			});
+		
+			it('should handle different label sets independently', () => {
+				const flags1 = l_array(['A', 'B']);
+				const flags2 = l_array(['X', 'Y', 'Z']);
+				
+				expect(flags1.A).toBe(1);
+				expect(flags1.B).toBe(2);
+				expect(flags2.X).toBe(1);
+				expect(flags2.Y).toBe(2);
+				expect(flags2.Z).toBe(4);
+			});
 		});
 
 		describe("l_LL", () => {
