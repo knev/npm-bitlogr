@@ -284,6 +284,79 @@ describe("LOGR and Helper Functions", () => {
 
 		});
 
+		describe('Bit Label Limits', () => {
+			// Helper to generate an array of labels
+			const generateLabels = (count) => Array(count).fill().map((_, i) => `L${i}`);
+		
+			it('should handle exactly 31 bits without overflow', () => {
+				const labels = generateLabels(31); // L0 to L30
+				const l_ = l_array(labels, 1);
+				
+				expect(l_.L0).toBe(1);           // 2⁰
+				expect(l_.L1).toBe(2);           // 2¹
+				expect(l_.L29).toBe(1 << 29);    // 2²⁹ = 536,870,912
+				expect(l_.L30).toBe(1 << 30);    // 2³⁰ = 1,073,741,824
+				expect(Object.keys(l_).length).toBe(31);
+			});
+		
+			it('should overflow at 32 bits in l_array', () => {
+				const labels32 = generateLabels(32); // L0 to L31
+				const l_32bit_ = l_array(labels32, 1);
+				
+				expect(l_32bit_.L0).toBe(1);           // 2⁰
+				expect(l_32bit_.L30).toBe(1 << 30);    // 2³⁰ = 1,073,741,824
+				expect(l_32bit_.L31).toBe(1 << 31);    // 2³¹ = -2147483648 (signed 32-bit max)
+				expect(Object.keys(l_32bit_).length).toBe(32);
+			
+				// Test one more to see wraparound
+				const labels33 = generateLabels(33); // L0 to L32
+				const l_33bits_ = l_array(labels33, 1);
+				
+				expect(l_33bits_.L31).toBe(1 << 31);    // 2³¹ = -2147483648
+				expect(l_33bits_.L32).toBe(1);          // 2³² wraps to 1 (32 & 0b11111 = 0)
+				expect(Object.keys(l_33bits_).length).toBe(33);
+			});
+		
+			it('should handle 31 bits in l_concat_array_ without overflow', () => {
+				const l_ = l_array(generateLabels(29), 1); // L0 to L28 (2⁰ to 2²⁸)
+				const l_concatd_ = l_concat_array(l_, ['L29', 'L30']);
+				
+				expect(l_.L0).toBe(1);         // 2⁰
+				expect(l_.L28).toBe(1 << 28);  // 2²⁸ = 268,435,456
+				expect(l_concatd_.L29).toBe(1 << 29);   // 2²⁹ = 536,870,912
+				expect(l_concatd_.L30).toBe(1 << 30);   // 2³⁰ = 1,073,741,824
+				expect(Object.keys(l_concatd_).length).toBe(31);
+			});
+		
+			it('should overflow at 32 bits in l_concat_array_', () => {
+				const l_ = l_array(generateLabels(30), 1); // L0 to L29 (2⁰ to 2²⁹)
+				const l_concatd_ = l_concat_array(l_, ['L30', 'L31']);
+				
+				expect(l_.L0).toBe(1);          // 2⁰
+				expect(l_.L29).toBe(1 << 29);   // 2²⁹ = 536,870,912
+				expect(l_concatd_.L30).toBe(1 << 30);   // 2³⁰ = 1,073,741,824
+				expect(l_concatd_.L31).toBe(1 << 31);   // 2³¹ = -2147483648 (not 0)
+				expect(Object.keys(l_concatd_).length).toBe(32);
+			});
+				
+			it('should overflow at 32 bits in merge_full_ with value conflict', () => {
+				const l1_ = l_array(generateLabels(30), 1); // L0 to L29 (2⁰ to 2²⁹)
+				const l2_ = { X: 1 << 1 }; // X: 2 (conflicts with L1)
+				const l_merged_ = l_merge(l1_, l2_);
+				
+				expect(l_merged_.L0).toBe(1);          // 2⁰
+				expect(l_merged_.L29).toBe(1 << 29);   // 2²⁹ = 536,870,912
+				expect(l_merged_.X).toBe(1 << 30);     // 2³⁰ = 1,073,741,824 (shifted from 2)
+				expect(Object.keys(l_merged_).length).toBe(31);
+				
+				// Adding one more should push to overflow
+				const l3_ = { Y: 1 << 2 }; // Y: 4 (conflicts with L2)
+				const l_final_ = l_merge(l_merged_, l3_);
+				expect(l_final_.Y).toBe(1 << 31);      // 2³¹ = -2147483648 (not 0)
+				expect(Object.keys(l_final_).length).toBe(32);
+			});
+		});
+
 		describe("l_LL", () => {
 
 			it("should handle zero shift correctly", () => {
