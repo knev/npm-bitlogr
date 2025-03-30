@@ -38,7 +38,7 @@ function handler_default_( /* ... */ ) {
 
 //-------------------------------------------------------------------------------------------------
 	
-class BitLogr {
+class LOGR {
 	constructor() {
 		this._handler_log= handler_default_;
 		this._Bint_labels= BigInt(0);
@@ -97,7 +97,7 @@ class BitLogr {
 //-------------------------------------------------------------------------------------------------
 
 export { 
-	BitLogr, 
+	LOGR, 
 	l_LL_ as l_LL, 
 	l_RR_ as l_RR,
 };

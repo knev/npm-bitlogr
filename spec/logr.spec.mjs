@@ -1,7 +1,7 @@
 
-import { BitLogr, l_LL, l_RR } from '../src/logr.mjs';
+import { LOGR, l_LL, l_RR } from '../src/logr.mjs';
 
-describe("BitLogr and Helper Functions", () => {
+describe("LOGR and Helper Functions", () => {
 	let LOGR_;
 	const l_= {
 		DEL : 0b1 << 0,		// removed
@@ -9,7 +9,7 @@ describe("BitLogr and Helper Functions", () => {
 	}
 
 	beforeEach(() => {
-		LOGR_ = new BitLogr();
+		LOGR_ = new LOGR();
 		LOGR_.labels= l_;
 	});
 
@@ -76,38 +76,38 @@ describe("BitLogr and Helper Functions", () => {
 		});
 
 		// Test for BitLogr class
-		describe("BitLogr;", () => {
+		describe("LOGR;", () => {
 
 			it("should initialize with default values", () => {
-				const LOGR = new BitLogr();
-				expect(LOGR.labels).toBe(0n);
-				expect(LOGR.toggled).toBe(0n);
-				expect(typeof LOGR._log_fxn).toBe("function");
-				expect(typeof LOGR._handler_log).toBe("function");
+				const LOGR_ = new LOGR();
+				expect(LOGR_.labels).toBe(0n);
+				expect(LOGR_.toggled).toBe(0n);
+				expect(typeof LOGR_._log_fxn).toBe("function");
+				expect(typeof LOGR_._handler_log).toBe("function");
 
 				spyOn(console, "assert");
-				LOGR.getLogger({});
+				LOGR_.getLogger({});
 				expect(console.assert).toHaveBeenCalledWith(false, 'no labels initialized')
-				expect(LOGR.toggled).toBe(0n);		
+				expect(LOGR_.toggled).toBe(0n);		
 			});
 
 			it("log should be NOP ", () => {
 				spyOn(LOGR_, "_handler_log");
 				let result;
 
-				let logr;
+				let log_;
 
-				logr = LOGR_.getLogger();
-				result = logr(l_.DEL, "test message");
+				log_ = LOGR_.getLogger();
+				result = log_(l_.DEL, "test message");
 				expect(result).toBeUndefined();
 				expect(console.log).not.toHaveBeenCalled();					
 				expect(LOGR_._handler_log).not.toHaveBeenCalled();	
 
-				logr = LOGR_.getLogger({ 
+				log_ = LOGR_.getLogger({ 
 						// DEL : 1,
 						// CXNS : 1
 					});
-				result = logr(l_.DEL | l_.CXNS, "test message");
+				result = log_(l_.DEL | l_.CXNS, "test message");
 				expect(result).toBeUndefined();
 				expect(console.log).not.toHaveBeenCalled();					
 				expect(LOGR_._handler_log).not.toHaveBeenCalled();	
@@ -130,63 +130,63 @@ describe("BitLogr and Helper Functions", () => {
 			});
 
 			it("should not update the logger after toggling", () => {
-				let logr;
+				let log_;
 				
-				logr = LOGR_.getLogger({});
-				logr(l_.DEL, "Initial test");
+				log_ = LOGR_.getLogger({});
+				log_(l_.DEL, "Initial test");
 				expect(consoleSpy).not.toHaveBeenCalled();
 	
-				logr = LOGR_.getLogger({ 
+				log_ = LOGR_.getLogger({ 
 						DEL : 1,
 						// CXNS : 1
 					});
-				logr(l_.DEL, "Should log");
+				log_(l_.DEL, "Should log");
 				expect(consoleSpy).toHaveBeenCalled();
 	
 				// Fetching a new logger works
-				const logr_new = LOGR_.getLogger();
-				logr_new(l_.DEL, "This should log");
+				const log_new_ = LOGR_.getLogger();
+				log_new_(l_.DEL, "This should log");
 				expect(consoleSpy).toHaveBeenCalledWith("This should log");
 			});			
 
 			it("should log to console with default handler when toggled matches", () => {
-				const logr = LOGR_.getLogger({ 
+				const log_ = LOGR_.getLogger({ 
 						DEL : 1,
 						CXNS : 1
 					});
-				const result = logr(l_.DEL, "test message");
+				const result = log_(l_.DEL, "test message");
 				expect(result).toBeTrue(); // Log should return true when toggled matches
 				expect(console.log).toHaveBeenCalledWith("test message");
 				expect(console.log).toHaveBeenCalledTimes(1);
 			});
 
 			it("should log to console with default handler when toggled matches with OR", () => {
-				const logr = LOGR_.getLogger({ 
+				const log_ = LOGR_.getLogger({ 
 						// DEL : 1,
 						CXNS : 1
 					});
-				const result = logr(l_.DEL | l_.CXNS, "test message");
+				const result = log_(l_.DEL | l_.CXNS, "test message");
 				expect(result).toBeTrue(); // Log should return true when toggled matches
 				expect(console.log).toHaveBeenCalledWith("test message");
 				expect(console.log).toHaveBeenCalledTimes(1);
 			});
 
 			it("should not log to console when toggled does not match", () => {
-				const logr = LOGR_.getLogger({ 
+				const log_ = LOGR_.getLogger({ 
 						// DEL : 1,
 						CXNS : 1
 					});
-				const result = logr(l_.DEL, "test message");
+				const result = log_(l_.DEL, "test message");
 				expect(result).toBeFalse(); // Log should return false when no match
 				expect(console.log).not.toHaveBeenCalled();
 			});
 	
 			it("should log multiple arguments to console with default handler", () => {
-				const logr = LOGR_.getLogger({ 
+				const log_ = LOGR_.getLogger({ 
 						DEL : 1,
 						// CXNS : 1
 					});
-				logr(l_.DEL, "test", 42, { foo: "bar" });
+				log_(l_.DEL, "test", 42, { foo: "bar" });
 				expect(console.log).toHaveBeenCalledWith("test", 42, { foo: "bar" });
 				expect(console.log).toHaveBeenCalledTimes(1);
 			});
@@ -212,9 +212,9 @@ describe("BitLogr and Helper Functions", () => {
 			}
 	
 			// Store log function locally
-			const logr = LOGR_.getLogger();
+			const log_ = LOGR_.getLogger();
 			const fxn_log = function() {
-				logr(l_.DEL | l_.CXNS, "this message should not log");
+				log_(l_.DEL | l_.CXNS, "this message should not log");
 				// LOGR_.log(l_.DEL | l_.CXNS, "this message should not log");
 			}
 	
