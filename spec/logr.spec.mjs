@@ -1,5 +1,5 @@
 
-import { LOGR, l_array, l_concat, l_concat_array, l_merge, l_LL, l_RR } from '../src/logr.mjs';
+import { LOGR, l_array, l_concat, l_merge, l_LL, l_RR } from '../src/logr.mjs';
 
 describe("LOGR and Helper Functions", () => {
 	let LOGR_;
@@ -122,7 +122,7 @@ describe("LOGR and Helper Functions", () => {
 		describe('l_concat_array', () => {
 			it('should add new labels after existing ones', () => {
 				const l_ = l_array(['DEL', 'CXNS']); // DEL: 1, CXNS: 2
-				const l_concatd_ = l_concat_array(l_, ['READ', 'WRITE']);
+				const l_concatd_ = l_concat(l_, ['READ', 'WRITE']);
 				
 				expect(l_concatd_).toEqual({
 					DEL: 0b1 << 0,   // 1
@@ -134,7 +134,7 @@ describe("LOGR and Helper Functions", () => {
 		
 			it('should preserve higher existing values', () => {
 				const l_AB_ = { A: 0b1 << 3, B: 0b1 << 5 }; // A: 8, B: 32
-				const l_concatd_ = l_concat_array(l_AB_, ['X', 'Y']);
+				const l_concatd_ = l_concat(l_AB_, ['X', 'Y']);
 				
 				expect(l_concatd_).toEqual({
 					A: 0b1 << 3,    // 8
@@ -145,7 +145,7 @@ describe("LOGR and Helper Functions", () => {
 			});
 		
 			it('should work with empty existing set', () => {
-				const l_concatd_ = l_concat_array({}, ['DEL', 'CXNS']);
+				const l_concatd_ = l_concat({}, ['DEL', 'CXNS']);
 				
 				expect(l_concatd_).toEqual({
 					DEL: 0b1 << 0,  // 1
@@ -155,7 +155,7 @@ describe("LOGR and Helper Functions", () => {
 		
 			it('should handle single new label', () => {
 				const l_ = l_array(['DEL']); // DEL: 1
-				const l_concatd_ = l_concat_array(l_, ['NEXT']);
+				const l_concatd_ = l_concat(l_, ['NEXT']);
 				
 				expect(l_concatd_).toEqual({
 					DEL: 0b1 << 0,  // 1
@@ -165,7 +165,7 @@ describe("LOGR and Helper Functions", () => {
 		
 			it('should preserve original values with no overlap', () => {
 				const l_ = l_array(['DEL', 'CXNS'], 0b1 << 2); // DEL: 4, CXNS: 8
-				const l_concatd_ = l_concat_array(l_, ['READ', 'WRITE']);
+				const l_concatd_ = l_concat(l_, ['READ', 'WRITE']);
 				
 				expect(l_concatd_).toEqual({
 					DEL: 0b1 << 2,   // 4
@@ -176,7 +176,7 @@ describe("LOGR and Helper Functions", () => {
 			});
 
 			it('direct concat of arrays', () => {
-				const l_concatd_ = l_concat_array(l_array(['DEL', 'CXNS']), ['READ', 'WRITE']);
+				const l_concatd_ = l_concat(l_array(['DEL', 'CXNS']), ['READ', 'WRITE']);
 				expect(l_concatd_).toEqual({
 					DEL: 0b1 << 0,   // 1
 					CXNS: 0b1 << 1,  // 2
@@ -319,7 +319,7 @@ describe("LOGR and Helper Functions", () => {
 		
 			it('should handle 31 bits in l_concat_array_ without overflow', () => {
 				const l_ = l_array(generateLabels(29), 1); // L0 to L28 (2⁰ to 2²⁸)
-				const l_concatd_ = l_concat_array(l_, ['L29', 'L30']);
+				const l_concatd_ = l_concat(l_, ['L29', 'L30']);
 				
 				expect(l_.L0).toBe(1);         // 2⁰
 				expect(l_.L28).toBe(1 << 28);  // 2²⁸ = 268,435,456
@@ -330,7 +330,7 @@ describe("LOGR and Helper Functions", () => {
 		
 			it('should overflow at 32 bits in l_concat_array_', () => {
 				const l_ = l_array(generateLabels(30), 1); // L0 to L29 (2⁰ to 2²⁹)
-				const l_concatd_ = l_concat_array(l_, ['L30', 'L31']);
+				const l_concatd_ = l_concat(l_, ['L30', 'L31']);
 				
 				expect(l_.L0).toBe(1);          // 2⁰
 				expect(l_.L29).toBe(1 << 29);   // 2²⁹ = 536,870,912

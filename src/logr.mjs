@@ -33,20 +33,22 @@ function l_array_(arr_labels, start = 1) {
     }, {}));
 }
 
-function l_concat_(...objs_labels) {
+function l_concat_(obj_labels, arg) {
+    if (Array.isArray(arg)) {
+        const len = l_length_(obj_labels);
+        const arr_labels_new = l_array_(arg, len);
+        return l_concat_(obj_labels, arr_labels_new);
+    }
+    
     const result = {};
-    for (const obj_labels of objs_labels)
-        for (const [key, value] of Object.entries(obj_labels))
-            if (!(key in result))
-                result[key] = value;
+    for (const [key, value] of Object.entries(obj_labels))
+        result[key] = value;
 
-	return Object.freeze(result);
-}
+    for (const [key, value] of Object.entries(arg))
+        if (! (key in result))
+            result[key] = value;
 
-function l_concat_array_(obj_labels, arr_labels) {
-    const len = l_length_(obj_labels);
-    const arr_labels_new = l_array_(arr_labels, len);
-    return l_concat_(obj_labels, arr_labels_new);
+    return Object.freeze(result);
 }
 
 function l_merge_(obj_labels1, obj_labels2) {
@@ -166,7 +168,6 @@ export {
 	LOGR, 
 	l_array_ as l_array,
 	l_concat_ as l_concat,
-	l_concat_array_  as l_concat_array,
 	l_merge_ as l_merge,
 	l_LL_ as l_LL, 
 	l_RR_ as l_RR,
