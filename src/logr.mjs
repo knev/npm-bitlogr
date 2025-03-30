@@ -14,11 +14,23 @@ function l_toBigInt_(ref, obj, ignore= false) {
 	return bigInt;
 }
 
-function l_array_(labels) {
-    return Object.freeze(labels.reduce((acc, key, index) => {
-        acc[key] = 1 << index;
+function l_array_(labels, idx_start = 0) {
+    return Object.freeze(labels.reduce((acc, key, idx) => {
+        acc[key] = 1 << (idx_start + idx);
         return acc;
-    }, {}));	
+    }, {}));
+}
+
+function l_merge_(...label_sets) {
+    const result = {};
+    for (const set of label_sets) {
+        for (const [key, value] of Object.entries(set)) {
+            if (!(key in result)) {
+                result[key] = value;
+            }
+        }
+    }
+    return Object.freeze(result);
 }
 
 function l_LL_(obj, x) {
@@ -106,6 +118,7 @@ class LOGR {
 export { 
 	LOGR, 
 	l_array_ as l_array,
+	l_merge_ as l_merge,
 	l_LL_ as l_LL, 
 	l_RR_ as l_RR,
 };

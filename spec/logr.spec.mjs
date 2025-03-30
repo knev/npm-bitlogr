@@ -1,5 +1,5 @@
 
-import { LOGR, l_LL, l_RR, l_array } from '../src/logr.mjs';
+import { LOGR, l_array, l_merge, l_LL, l_RR } from '../src/logr.mjs';
 
 describe("LOGR and Helper Functions", () => {
 	let LOGR_;
@@ -79,6 +79,33 @@ describe("LOGR and Helper Functions", () => {
 				expect(flags2.X).toBe(1);
 				expect(flags2.Y).toBe(2);
 				expect(flags2.Z).toBe(4);
+			});
+		});
+
+		describe('l_merge', () => {
+			const l_ = l_array(['DEL', 'CXNS']); // DEL: 1, CXNS: 2
+			const l_AB = {
+				A: 0b1 << 3,  // 8
+				B: 0b1 << 5   // 32
+			};
+		
+			it('should merge flag sets while preserving original values', () => {
+				const merged = l_merge(l_, l_AB);
+				
+				expect(merged).toEqual({
+					DEL: 0b1 << 0,  // 1 (from l_)
+					CXNS: 0b1 << 1, // 2 (from l_)
+					A: 0b1 << 3,    // 8 (from l_AB, unchanged)
+					B: 0b1 << 5     // 32 (from l_AB, unchanged)
+				});
+			});
+		
+			it('values when keys overlap', () => {
+				const set1 = { A: 0b1 << 3 }; // A: 8
+				const set2 = { A: 0b1 << 1 }; // A: 2
+				const merged = l_merge(set1, set2);
+				
+				expect(merged.A).toBe(0b1 << 3); // 8 (first set wins)
 			});
 		});
 
