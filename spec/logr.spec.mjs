@@ -80,6 +80,15 @@ describe("LOGR and Helper Functions", () => {
 				expect(flags2.Y).toBe(2);
 				expect(flags2.Z).toBe(4);
 			});
+
+			it('should create flags starting at specified index', () => {
+				const flags = l_array(['DEL', 'CXNS'], 0b1 << 2);
+				expect(flags).toEqual({
+					DEL: 0b1 << 2,  // 4
+					CXNS: 0b1 << 3  // 8
+				});
+			});
+		
 		});
 
 		describe('l_merge', () => {
@@ -101,12 +110,13 @@ describe("LOGR and Helper Functions", () => {
 			});
 		
 			it('values when keys overlap', () => {
-				const set1 = { A: 0b1 << 3 }; // A: 8
-				const set2 = { A: 0b1 << 1 }; // A: 2
+				const set1 = l_array(['A'], 0b1 << 3); // A: 8
+				const set2 = l_array(['A'], 0b1 << 1); // A: 2
 				const merged = l_merge(set1, set2);
 				
 				expect(merged.A).toBe(0b1 << 3); // 8 (first set wins)
 			});
+
 		});
 
 		describe("l_LL", () => {

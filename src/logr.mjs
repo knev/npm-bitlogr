@@ -14,9 +14,9 @@ function l_toBigInt_(ref, obj, ignore= false) {
 	return bigInt;
 }
 
-function l_array_(labels, idx_start = 0) {
-    return Object.freeze(labels.reduce((acc, key, idx) => {
-        acc[key] = 1 << (idx_start + idx);
+function l_array_(labels, start = 1) {
+    return Object.freeze(labels.reduce((acc, key, index) => {
+        acc[key] = start << index;
         return acc;
     }, {}));
 }
