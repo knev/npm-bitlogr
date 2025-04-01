@@ -121,61 +121,87 @@ function l_toBigInt_(obj_labels, obj, ignore= false) {
 
 // console.log(l_toBigInt_({},{}))
 
-class LOGR {
-	constructor() {
-		this._handler_log= handler_default_;
-		this._Bint_labels= BigInt(0);
-		this._Bint_toggled= BigInt(0);
+const LOGR = (function () {
+	let _instance; // Private variable to hold the single instance
 
-        // Define a standalone NOP function
-        this._nopLog = () => {};
-        this._log_fxn = this._nopLog; // Default to standalone NOP
+	function _create_instance() {
+		// Private state (replacing constructor properties)
+		let _handler_log = handler_default_;
+		let _obj_labels = undefined;
+		let _Bint_toggled = BigInt(0);
+
+		// Define a standalone NOP function
+		const _nopLog = () => { };
+		let _log_fxn = _nopLog; // Default to standalone NOP
+
+		return {
+			set handler(fx) {
+				_handler_log = fx;
+			},
+			get handler() {
+				return _handler_log;
+			},
+
+			get labels() { return _obj_labels; },
+			set labels(obj) {
+				_obj_labels = obj;
+				_Bint_toggled = BigInt(0);
+			},
+
+			// put= function(label, abbrv) {
+			// 	let name= __name(label);
+			// 	_labels[name]= label[name];
+			// 	console.log(_labels);
+			// }
+
+			get toggled() { return _Bint_toggled; },
+			set toggled(obj_toggled) {
+				_Bint_toggled= l_toBigInt_(_obj_labels, obj_toggled);
+
+				if (_Bint_toggled === BigInt(0)) {
+					_log_fxn = () => { }; // Reset to lightweight NOP
+					return;
+				}
+
+				const self = this; // Avoid repeated 'this' lookups
+				_log_fxn = function (nr_logged, /* ... */) {
+					if ((BigInt(nr_logged) & _Bint_toggled) === BigInt(0))
+						return false;
+
+					var args = Array.prototype.slice.call(arguments);
+					args.shift(); // remove first arg: nr_logged
+					_handler_log.apply(self, args);
+
+					return true;
+				}
+			},
+
+			log(nr_logged, /* ... */) {
+                return _log_fxn.apply(this, arguments);
+            }
+		};
 	}
 
-	set handler(fx) {
-		this._handler_log= fx;
-	}
-
-	get labels() { return this._Bint_labels; }
-	set labels(obj) {
-		this._Bint_labels= obj;
-		this._Bint_toggled= BigInt(0);
-	}
-
-	// put= function(label, abbrv) {
-	// 	let name= __name(label);
-	// 	_labels[name]= label[name];
-	// 	console.log(_labels);
-	// }
-
-	getLogger(obj) {
-		if (obj === undefined)
-			return this._log_fxn.bind(this);
-
-		this._Bint_toggled= l_toBigInt_(this._Bint_labels, obj);
-
-		if (this._Bint_toggled === BigInt(0)) {
-            this._log_fxn = () => {}; // Reset to lightweight NOP
-			return this._log_fxn.bind(this);
+	// Public interface
+	return {
+		instance() {
+			if (!_instance) {
+				_instance = _create_instance(); // Lazy initialization
+			}
+			return _instance;
 		}
+	};
 
-		const self = this; // Avoid repeated 'this' lookups
-		this._log_fxn = function(nr_logged, /* ... */) {
-			if ( (BigInt(nr_logged) & this._Bint_toggled) === BigInt(0))
-				return false;
-		
-			var args = Array.prototype.slice.call(arguments);
-			args.shift(); // remove first arg: nr_logged
-			this._handler_log.apply(this, args);
-	
-			return true;
-		}
-		return this._log_fxn.bind(this);
-	}
+})();
 
-	get toggled() { return this._Bint_toggled; }
+// Usage example:
+// const logr = LOGR.instance();
+// logr.labels = BigInt(42);
+// console.log(logr.labels); // BigInt(42)
+// console.log(logr.toggled); // BigInt(0)
 
-}
+// const logr2 = LOGR.instance();
+// console.log(logr === logr2);
 
 //-------------------------------------------------------------------------------------------------
 
