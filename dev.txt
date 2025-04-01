@@ -1,7 +1,11 @@
 
 - NOP function when when flags are not toggled
-- no label dependency 
+- no label dependency between compilation units
 - each unit can ignore, inherit, overwrite or rename sub unit labels
 - can specify a custom logging handler
 
 
+v0 to v1
+- LOGR is exported, so direct access to LOGR.labels instead of export of l.
+- rename class
+- LOGR is a singleton
