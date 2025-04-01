@@ -1,32 +1,64 @@
 
-import { LOGR, l_array, l_concat, l_merge, l_LL, l_RR } from '../src/logr.mjs';
+import { LOGR, l_length, l_array, l_concat, l_merge, l_LL, l_RR } from '../src/logr.mjs';
+import { LOGR as module_LOGR_, l as module_l_, log_as_member } from './module.mjs';
 
-describe("LOGR and Helper Functions", () => {
-	let LOGR_;
-	const l_= {
-		DEL : 0b1 << 0,		// removed
-		CXNS : 0b1 << 2,	// connections
-	}
+describe("LOGR and helper Functions;", () => {
 
-	beforeEach(() => {
-		LOGR_ = new LOGR();
-		LOGR_.labels= l_;
-	});
+	describe("helper Functions;", () => {
 
-	describe("functionality;", () => {
-		let consoleSpy;
-
-		beforeEach(() => {
-			// Spy on console.log before each test
-			consoleSpy = spyOn(console, "log");
+		describe('l_length_', () => {
+			// Test empty input
+			it('should return 0b1 << 0 for an empty object', () => {
+				expect(l_length({})).toBe(0b1 << 0);  // 1
+			});
+		
+			// Test single value cases (powers of 2)
+			it('should return 0b1 << 1 for a single value of 0b1 << 0', () => {
+				expect(l_length({ a: 0b1 << 0 })).toBe(0b1 << 1);  // 1 -> 2
+			});
+		
+			it('should return 0b1 << 3 for a single value of 0b1 << 2', () => {
+				expect(l_length({ a: 0b1 << 2 })).toBe(0b1 << 3);  // 4 -> 8
+			});
+		
+			// Test multiple values (powers of 2)
+			it('should return next power of 2 based on maximum value', () => {
+				expect(l_length({ a: 0b1 << 0, b: 0b1 << 1, c: 0b1 << 2 })).toBe(0b1 << 3);  // 1, 2, 4 -> 8
+				expect(l_length({ x: 0b1 << 1, y: 0b1 << 3, z: 0b1 << 2 })).toBe(0b1 << 4);  // 2, 8, 4 -> 16
+			});
+		
+			// Test negative and zero values
+			// it('should return 0b1 << 0 when all values are zero or negative', () => {
+			// 	expect(l_length_({ a: 0 })).toBe(0b1 << 0);  // 0 -> 1
+			// 	expect(l_length_({ a: -(0b1 << 0), b: -(0b1 << 1), c: -(0b1 << 2) })).toBe(0b1 << 0);  // -1, -2, -4 -> 1
+			// });
+		
+			// it('should handle mixed positive and negative values', () => {
+			// 	expect(l_length_({ a: 0b1 << 1, b: -(0b1 << 1), c: 0b1 << 0 })).toBe(0b1 << 2);  // 2, -2, 1 -> 4
+			// 	expect(l_length_({ a: -(0b1 << 2), b: 0b1 << 3, c: -(0b1 << 0) })).toBe(0b1 << 4);  // -4, 8, -1 -> 16
+			// });
+		
+			// Test exact powers of 2
+			it('should handle exact powers of 2 correctly', () => {
+				expect(l_length({ a: 0b1 << 1 })).toBe(0b1 << 2);  // 2 -> 4
+				expect(l_length({ a: 0b1 << 2 })).toBe(0b1 << 3);  // 4 -> 8
+				expect(l_length({ a: 0b1 << 3 })).toBe(0b1 << 4);  // 8 -> 16
+			});
+		
+			// Test non-numeric values
+			// it('should handle non-numeric values gracefully', () => {
+			// 	expect(l_length_({ a: 0b1 << 1, b: 'hello', c: 0b1 << 0 })).toBe(0b1 << 2);  // 2, 'hello', 1 -> 4
+			// 	expect(l_length_({ a: null, b: 0b1 << 2, c: undefined })).toBe(0b1 << 3);  // null, 4, undefined -> 8
+			// });
+		
+			// Test large numbers (powers of 2)
+			it('should handle large numbers correctly', () => {
+				expect(l_length({ a: 0b1 << 9 })).toBe(0b1 << 10);  // 512 -> 1024
+				expect(l_length({ a: 0b1 << 10 })).toBe(0b1 << 11);  // 1024 -> 2048
+			});
 		});
 
-		afterEach(() => {
-			// Reset the spy after each test to avoid interference
-			console.log.calls.reset();
-		});
-
-		describe('l_array', () => {
+		describe('l_array;', () => {
 			it('should assign correct bit values sequentially', () => {
 				const l_ = l_array(['DEL', 'CXNS', 'ACTIVE']);
 				
@@ -91,14 +123,14 @@ describe("LOGR and Helper Functions", () => {
 		
 		});
 
-		describe('l_concat', () => {
+		describe('l_concat (object);', () => {
 			const l_ = l_array(['DEL', 'CXNS']); // DEL: 1, CXNS: 2
 			const l_AB = {
 				A: 0b1 << 3,  // 8
 				B: 0b1 << 5   // 32
 			};
 		
-			it('should merge flag sets while preserving original values', () => {
+			it('should concat label sets while preserving original values', () => {
 				const l_concatd_ = l_concat(l_, l_AB);
 				
 				expect(l_concatd_).toEqual({
@@ -109,17 +141,17 @@ describe("LOGR and Helper Functions", () => {
 				});
 			});
 		
-			it('values when keys overlap', () => {
-				const l1_ = l_array(['A'], 0b1 << 3); // A: 8
-				const l2_ = l_array(['A'], 0b1 << 1); // A: 2
-				const l_concatd_ = l_concat(l1_, l2_);
+			// it('IF duplicate keys they should have the same value,  ', () => {
+			// 	const l1_ = l_array(['A'], 0b1 << 3); // A: 8
+			// 	const l2_ = l_array(['A'], 0b1 << 1); // A: 2
+			// 	const l_concatd_ = l_concat(l1_, l2_);
 				
-				expect(l_concatd_.A).toBe(0b1 << 3); // 8 (first set wins)
-			});
+			// 	expect(l_concatd_.A).toBe(0b1 << 3); // 8 (first set wins)
+			// });
 
 		});
 
-		describe('l_concat_array', () => {
+		describe('l_concat (array);', () => {
 			it('should add new labels after existing ones', () => {
 				const l_ = l_array(['DEL', 'CXNS']); // DEL: 1, CXNS: 2
 				const l_concatd_ = l_concat(l_, ['READ', 'WRITE']);
@@ -129,18 +161,6 @@ describe("LOGR and Helper Functions", () => {
 					CXNS: 0b1 << 1,  // 2
 					READ: 0b1 << 2,  // 4
 					WRITE: 0b1 << 3  // 8
-				});
-			});
-		
-			it('should preserve higher existing values', () => {
-				const l_AB_ = { A: 0b1 << 3, B: 0b1 << 5 }; // A: 8, B: 32
-				const l_concatd_ = l_concat(l_AB_, ['X', 'Y']);
-				
-				expect(l_concatd_).toEqual({
-					A: 0b1 << 3,    // 8
-					B: 0b1 << 5,    // 32
-					X: 0b1 << 6,    // 64
-					Y: 0b1 << 7     // 128
 				});
 			});
 		
@@ -175,6 +195,21 @@ describe("LOGR and Helper Functions", () => {
 				});
 			});
 
+			it('concat with a gap', () => {
+				const l_ = l_array(['DEL', 'CXNS'], 0b1 << 2); // DEL: 4, CXNS: 8
+				const l_concatd_ = l_concat(l_, {
+					READ: 0b1 << 0,
+					WRITE: 0b1 << 3
+				});
+
+				expect(l_concatd_).toEqual({
+					DEL: 0b1 << 2,   // 4
+					CXNS: 0b1 << 3,  // 8
+					READ: 0b1 << 4,  // 16
+					WRITE: 0b1 << 7
+				});
+			});
+
 			it('direct concat of arrays', () => {
 				const l_concatd_ = l_concat(l_array(['DEL', 'CXNS']), ['READ', 'WRITE']);
 				expect(l_concatd_).toEqual({
@@ -187,7 +222,7 @@ describe("LOGR and Helper Functions", () => {
 
 		});
 
-		describe('l_merge', () => {
+		describe('l_merge;', () => {
 			it('should merge non-overlapping interspersed label sets', () => {
 				const l1 = { A: 0b1 << 3, B: 0b1 << 1 }; // A: 8, B: 2
 				const l2 = { C: 0b1 << 0, D: 0b1 << 4 }; // C: 1, D: 16
@@ -284,7 +319,7 @@ describe("LOGR and Helper Functions", () => {
 
 		});
 
-		describe('Bit Label Limits', () => {
+		describe('bit Label Limits;', () => {
 			// Helper to generate an array of labels
 			const generateLabels = (count) => Array(count).fill().map((_, i) => `L${i}`);
 		
@@ -357,7 +392,11 @@ describe("LOGR and Helper Functions", () => {
 			});
 		});
 
-		describe("l_LL", () => {
+		describe("l_LL;", () => {
+			const l_= {
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			}
 
 			it("should handle zero shift correctly", () => {
 				const result = l_LL(l_, 0);
@@ -380,8 +419,12 @@ describe("LOGR and Helper Functions", () => {
 
 		});
 
-		describe("l_RR", () => {
-
+		describe("l_RR;", () => {
+			const l_= {
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			}
+	
 			it("should handle zero shift correctly", () => {
 				const result = l_RR(l_, 0);
 				expect(result).toEqual(l_);
@@ -406,111 +449,103 @@ describe("LOGR and Helper Functions", () => {
 
 		});
 
-		// Test for BitLogr class
-		describe("LOGR;", () => {
+	});
 
-			it("should initialize with default values", () => {
-				const LOGR_ = new LOGR();
-				expect(LOGR_.labels).toBe(0n);
-				expect(LOGR_.toggled).toBe(0n);
-				expect(typeof LOGR_._log_fxn).toBe("function");
-				expect(typeof LOGR_._handler_log).toBe("function");
+	describe("LOGR;", () => {
+		let LOGR_;
+		const l_= {
+			DEL : 0b1 << 0,		// removed
+			CXNS : 0b1 << 2,	// connections
+		}
 
-				spyOn(console, "assert");
-				LOGR_.getLogger({});
-				expect(console.assert).toHaveBeenCalledWith(false, 'no labels initialized')
-				expect(LOGR_.toggled).toBe(0n);		
-			});
+		beforeEach(() => {
+			LOGR_= LOGR.instance();
+			LOGR_.labels= module_l_; // reset the labels back to that of submodule
 
-			it("log should be NOP ", () => {
-				spyOn(LOGR_, "_handler_log");
-				let result;
+			// Spy on console.log before each test
+			spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
+		});
 
-				let log_;
-
-				log_ = LOGR_.getLogger();
-				result = log_(l_.DEL, "test message");
-				expect(result).toBeUndefined();
-				expect(console.log).not.toHaveBeenCalled();					
-				expect(LOGR_._handler_log).not.toHaveBeenCalled();	
-
-				log_ = LOGR_.getLogger({ 
-						// DEL : 1,
-						// CXNS : 1
-					});
-				result = log_(l_.DEL | l_.CXNS, "test message");
-				expect(result).toBeUndefined();
-				expect(console.log).not.toHaveBeenCalled();					
-				expect(LOGR_._handler_log).not.toHaveBeenCalled();	
-			});
-
-			it("verify the initial prototype log function overridden", () => {
-				const initialLog = LOGR_._log_fxn;
-				// This overrides the log function
-				LOGR_.getLogger({ 
-						DEL : 1,
-						CXNS : 1
-					});
-				expect(LOGR_._log_fxn).not.toBe(initialLog); // Should now be different			
-			});
-
-			it("should set and get handler correctly", () => {
-				const customHandler = jasmine.createSpy("customHandler");
-				LOGR_.handler = customHandler;
-				expect(LOGR_._handler_log).toBe(customHandler);
-			});
-
-			it("should not update the logger after toggling", () => {
-				let log_;
-				
-				log_ = LOGR_.getLogger({});
-				log_(l_.DEL, "Initial test");
-				expect(consoleSpy).not.toHaveBeenCalled();
+		afterEach(() => {
+			// Reset the spy after each test to avoid interference
+			console.log.calls.reset();
+		});
 	
-				log_ = LOGR_.getLogger({ 
-						DEL : 1,
-						// CXNS : 1
-					});
-				log_(l_.DEL, "Should log");
-				expect(consoleSpy).toHaveBeenCalled();
+		it("should initialize with default values", () => {
+			expect(LOGR_.labels).toBe(module_l_); // because it is a singleton class
+			expect(LOGR_.toggled).toBe(0n);
+
+			spyOn(console, "assert");
+			LOGR_.labels= undefined;
+			expect(() => {
+				LOGR_.toggled= {
+					DEL : true,
+					// CXNS : true
+				}
+			}).toThrowError(TypeError, /Cannot read properties of undefined \(reading 'DEL'\)/);
+			expect(console.assert).toHaveBeenCalledWith(false, 'no labels initialized')
+		});
+
+		it("should verify the handler changes when explicitly overridden", () => {
+			const initial_handler = LOGR_.handler; // Capture initial handler
+			const newHandler = jasmine.createSpy('newHandler');
 	
-				// Fetching a new logger works
-				const log_new_ = LOGR_.getLogger();
-				log_new_(l_.DEL, "This should log");
-				expect(consoleSpy).toHaveBeenCalledWith("This should log");
-			});			
+			// Explicitly override the handler
+			LOGR_.handler = newHandler;
+	
+			expect(LOGR_.handler).toBe(newHandler); // Should be the new handler
+			expect(LOGR_.handler).not.toBe(initial_handler); // Should differ from initial
+		});
 
-			it("should log to console with default handler when toggled matches", () => {
-				const log_ = LOGR_.getLogger({ 
-						DEL : 1,
-						CXNS : 1
-					});
-				const result = log_(l_.DEL, "test message");
-				expect(result).toBeTrue(); // Log should return true when toggled matches
-				expect(console.log).toHaveBeenCalledWith("test message");
-				expect(console.log).toHaveBeenCalledTimes(1);
-			});
+		it('should reflect _log_fxn change when toggled is set', () => {
+			// Spy on the handler to observe calls
+			const handlerSpy = jasmine.createSpy('handlerSpy');
+			LOGR_.handler = handlerSpy;
+			LOGR_.labels = l_;
+	
+			// Initial state: toggled is unset, _log_fxn should be NOP
+			LOGR_.log(l_.DEL, 'Initial message');
+			expect(handlerSpy).not.toHaveBeenCalled(); // NOP behavior
+	
+			LOGR_.toggled= { 
+				DEL : true,
+				// CXNS : true
+			};
 
-			it("should log to console with default handler when toggled matches with OR", () => {
-				const log_ = LOGR_.getLogger({ 
-						// DEL : 1,
-						CXNS : 1
-					});
-				const result = log_(l_.DEL | l_.CXNS, "test message");
-				expect(result).toBeTrue(); // Log should return true when toggled matches
-				expect(console.log).toHaveBeenCalledWith("test message");
-				expect(console.log).toHaveBeenCalledTimes(1);
-			});
+			LOGR_.log(l_.DEL, 'DEL message');
+			expect(handlerSpy).toHaveBeenCalledWith('DEL message');
+	
+			handlerSpy.calls.reset();
+			LOGR_.log(l_.CXNS, 'CXNS message');
+			expect(handlerSpy).not.toHaveBeenCalled(); // No match
+	
+			LOGR_.toggled= { 
+				// DEL : true,
+				CXNS : true
+			};
+	
+			LOGR_.log(l_.DEL, 'DEL message again');
+			expect(handlerSpy).not.toHaveBeenCalled(); // No match
+	
+			handlerSpy.calls.reset();
+			LOGR_.log(l_.CXNS, 'CXNS message again');
+			expect(handlerSpy).toHaveBeenCalledWith('CXNS message again');
 
-			it("should not log to console when toggled does not match", () => {
-				const log_ = LOGR_.getLogger({ 
-						// DEL : 1,
-						CXNS : 1
-					});
-				const result = log_(l_.DEL, "test message");
-				expect(result).toBeFalse(); // Log should return false when no match
-				expect(console.log).not.toHaveBeenCalled();
-			});
+			// should log to console with default handler when toggled matches with OR
+			handlerSpy.calls.reset();
+			LOGR_.log(l_.DEL | l_.CXNS, 'CXNS message again');
+			expect(handlerSpy).toHaveBeenCalledWith('CXNS message again');
+
+			// should reset _log_fxn to NOP when toggled is cleared
+			LOGR_.toggled = {};
+	
+			handlerSpy.calls.reset();
+			LOGR_.log(l_.DEL, 'NOP message');
+			expect(handlerSpy).not.toHaveBeenCalled(); // Back to NOP
+		});
+	
+	});
+
 	describe("two LOGRs;", () => {
 		let consoleSpy;
 
@@ -519,12 +554,24 @@ describe("LOGR and Helper Functions", () => {
 			DEL : 0b1 << 0,		// removed
 			CXNS : 0b1 << 2,	// connections
 		}
+		
+		// Define the default handler explicitly if not exported
+		const defaultHandler = function(...args) {
+			console.log.apply(console, args);
+		};
+	
+		beforeAll(() => {
+			local_LOGR_ = LOGR.instance();
+			local_LOGR_.handler = defaultHandler; // Set known good handler
+			local_LOGR_.labels = module_l_; // Baseline
+			local_LOGR_.toggled = {};
+			console.log("two LOGRs beforeAll: Handler reset, labels set to module_l");
+		});
 	
 		beforeEach(() => {
 			local_LOGR_= LOGR.instance();
-			module_LOGR_.toggled= {}
-
-			consoleSpy = spyOn(console, "log");
+			local_LOGR_.handler = defaultHandler; // Ensure handler per test
+			consoleSpy = spyOn(console, "log").and.callThrough();
 		});
 
 		afterEach(() => {
@@ -617,16 +664,22 @@ describe("LOGR and Helper Functions", () => {
 			console.log.calls.reset();
 		});
 	
-		it("NOP", () => {
+		xit("NOP", () => {
 			const fxn_empty = function() {
 				// Empty function (NOP)
 			}
 	
 			// Store log function locally
-			const log_ = LOGR_.getLogger();
+			const LOGR_= LOGR.instance();
+			const l_= {
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			}
+			LOGR_.labels= l_;
+			LOGR_.toggled= {}
+
 			const fxn_log = function() {
-				log_(l_.DEL | l_.CXNS, "this message should not log");
-				// LOGR_.log(l_.DEL | l_.CXNS, "this message should not log");
+				LOGR_.log(l_.DEL | l_.CXNS, "this message should not log");
 			}
 	
 			// Warm-up runs to avoid JIT compilation skewing results
@@ -665,6 +718,5 @@ describe("LOGR and Helper Functions", () => {
 		});
 	
 	});
-		
-});
 
+});

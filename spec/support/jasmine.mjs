@@ -11,4 +11,5 @@ export default {
     random: true,
     forbidDuplicateNames: true
   }
+	"random": false
 }

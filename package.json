@@ -26,6 +26,7 @@
 	},
 	"homepage": "https://github.com/knev/npm-bitlogr.git#readme",
 	"devDependencies": {
+		"@knev/bitlogr": "^1.0.4",
 		"del-cli": "^6.0.0",
 		"jasmine": "^5.6.0",
 		"rollup": "^4.38.0"
