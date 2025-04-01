@@ -511,17 +511,97 @@ describe("LOGR and Helper Functions", () => {
 				expect(result).toBeFalse(); // Log should return false when no match
 				expect(console.log).not.toHaveBeenCalled();
 			});
+	describe("two LOGRs;", () => {
+		let consoleSpy;
+
+		let local_LOGR_;
+		const local_l_= {
+			DEL : 0b1 << 0,		// removed
+			CXNS : 0b1 << 2,	// connections
+		}
 	
-			it("should log multiple arguments to console with default handler", () => {
-				const log_ = LOGR_.getLogger({ 
-						DEL : 1,
-						// CXNS : 1
-					});
-				log_(l_.DEL, "test", 42, { foo: "bar" });
-				expect(console.log).toHaveBeenCalledWith("test", 42, { foo: "bar" });
-				expect(console.log).toHaveBeenCalledTimes(1);
+		beforeEach(() => {
+			local_LOGR_= LOGR.instance();
+			module_LOGR_.toggled= {}
+
+			consoleSpy = spyOn(console, "log");
+		});
+
+		afterEach(() => {
+			// Reset the spy after each test to avoid interference
+			consoleSpy.calls.reset();
+		});
+
+		it("local_LOGR_ should fire", () => {
+			local_LOGR_.labels= local_l_;
+			local_LOGR_.toggled= {
+				DEL : true
+			};
+
+			local_LOGR_.log(local_l_.DEL, "local_LOGR_: This should log");
+			expect(consoleSpy).toHaveBeenCalledWith("local_LOGR_: This should log");
+		});
+
+		it("module LOGR_ should fire, without importing it", () => {
+			local_LOGR_.labels= module_l_;
+			local_LOGR_.toggled= {
+				EVENTS : true
+			};
+
+			log_as_member();
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+		});
+
+		it("Borrow module_LOGR_, forget to update labels", () => {
+			module_LOGR_.toggled= {
+				DEL : true
+			};
+
+			module_LOGR_.log(local_l_.DEL, "local module_LOGR_: This should NOT log");
+			expect(consoleSpy).not.toHaveBeenCalledWith("local module_LOGR_: This should NOT log");
+		});
+
+		it("Borrow module_LOGR_", () => {
+			const l_= l_merge(module_l_, local_l_);
+			expect(l_).toEqual({ 
+				EVENTS : 0b1 << 3,
+				HANDLERS : 0b1 << 4,
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
 			});
-	
+			module_LOGR_.labels= l_;
+			module_LOGR_.toggled= {
+				DEL : true
+			};
+
+			module_LOGR_.log(local_l_.DEL, "local module_LOGR_: This should log");
+			expect(consoleSpy).toHaveBeenCalledWith("local module_LOGR_: This should log");
+		});
+
+		it("reassigning a new name to sub-module keys", () => {
+			const l_= l_array(['EVENTS','HANDLERS','DEL', 'MORE_EVENTS']);
+			expect(l_).toEqual({ 
+				EVENTS : 0b1 << 0,
+				HANDLERS : 0b1 << 1,
+				DEL : 0b1 << 2,		// removed
+				MORE_EVENTS : 0b1 << 3,	// connections
+			});
+			local_LOGR_.labels= l_;
+
+			// in the module, the labels are a const where EVENTS is EVENTS : 0b1 << 3.
+			// trying to reassing EVENTS to EVENTS : 0b1 << 0 won't work
+			module_LOGR_.toggled= {
+				EVENTS : true
+			};
+			log_as_member();
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+
+			// this fires, because the value of CXNS is 0b1 << 3, which is the same as EVENTS in the module
+			module_LOGR_.toggled= {
+				MORE_EVENTS : true
+			};
+			log_as_member();
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
 		});
 
 	});
