@@ -653,6 +653,14 @@ describe("LOGR and helper Functions;", () => {
 
 	});
 
+	// TODO: 
+	// We can achieve this using a build-time transformation that replaces LOGR_.log(...) calls with a no-op statement. 
+	// Here’s how: 1. Use a Build Tool with Code Transformation
+	// We’ll leverage a tool like Babel with a custom plugin to rewrite LOGR_.log(...) calls in production. 
+	// This is the closest JavaScript equivalent to a C++ macro.
+	// 2. Babel Plugin to Strip log Calls
+	// Create a custom Babel plugin to remove LOGR_.log(...) calls in production:
+
 	describe("performance;", () => {
 		beforeEach(() => {
 			// Spy on console.log before each test
@@ -664,7 +672,7 @@ describe("LOGR and helper Functions;", () => {
 			console.log.calls.reset();
 		});
 	
-		xit("NOP", () => {
+		it("NOP", () => {
 			const fxn_empty = function() {
 				// Empty function (NOP)
 			}
@@ -679,7 +687,7 @@ describe("LOGR and helper Functions;", () => {
 			LOGR_.toggled= {}
 
 			const fxn_log = function() {
-				LOGR_.log(l_.DEL | l_.CXNS, "this message should not log");
+				LOGR_.log(l_.DEL | l_.CXNS, "this message should not log", JSON.stringify(LOGR_.labels));
 			}
 	
 			// Warm-up runs to avoid JIT compilation skewing results
