@@ -3,17 +3,6 @@
 const __name = obj => Object.keys(obj)[0];
 // console.log('OUT', __name({variableName}) );
 
-function l_toBigInt_(ref, obj, ignore= false) {
-	console.assert(ref !== BigInt(0), 'no labels initialized');
-	let bigInt = BigInt(0);
-	for (const [k,v] of Object.entries(obj)) {
-		if ( ( ignore || v ) && ref[k])
-			bigInt|= BigInt( ref[k] );			
-		// console.log('0b'+ bigInt.toString(2) );
-	}
-	return bigInt;
-}
-
 //-------------------------------------------------------------------------------------------------
 
 function l_length_(obj_labels) {
@@ -22,6 +11,8 @@ function l_length_(obj_labels) {
 		return 1; // Empty object case, start at 1
 
     const value_max = Math.max(...labels);
+		if (value_max <= 0) return 1
+
     const bit_highest = Math.floor(Math.log2(value_max));
     return 1 << (bit_highest + 1);
 }
@@ -34,21 +25,32 @@ function l_array_(arr_labels, start = 1) {
 }
 
 function l_concat_(obj_labels, arg) {
-    if (Array.isArray(arg)) {
-        const len = l_length_(obj_labels);
-        const arr_labels_new = l_array_(arg, len);
-        return l_concat_(obj_labels, arr_labels_new);
-    }
-    
-    const result = {};
-    for (const [key, value] of Object.entries(obj_labels))
-        result[key] = value;
+	if (Array.isArray(arg)) {
+		const len = l_length_(obj_labels);
+		const arr_labels_new = l_array_(arg, len);
+		return l_concat_(obj_labels, arr_labels_new);
+	}
 
-    for (const [key, value] of Object.entries(arg))
-        if (! (key in result))
-            result[key] = value;
+	const next_pos = l_length_(obj_labels);
+	const result = { ...obj_labels };
+	const arg_entries = Object.entries(arg);
 
-    return Object.freeze(result);
+	let min_arg = Infinity;
+	for (const [, value] of arg_entries) {
+		if (value > 0 && value < min_arg) min_arg = value;
+	}
+    // Shift only if min_arg is less than next_pos
+    const shift = min_arg === Infinity || min_arg >= next_pos 
+        ? 0 
+        : Math.floor(Math.log2(next_pos / min_arg));
+
+	for (const [key, value] of arg_entries) {
+		if (!(key in result)) {
+			result[key] = value === 0 ? 0 : value << shift;
+		}
+	}
+
+	return Object.freeze(result);
 }
 
 function l_merge_(obj_labels1, obj_labels2) {
@@ -86,14 +88,14 @@ function l_LL_(obj, x) {
 	const obj_new= {}
 	for (const [k,v] of Object.entries(obj))
 		obj_new[k]= v<<x;
-	return obj_new;
+	return Object.freeze(obj_new);
 }
 
 function l_RR_(obj, x) {
 	const obj_new= {}
 	for (const [k,v] of Object.entries(obj))
 		obj_new[k]= v>>x;
-	return obj_new;
+	return Object.freeze(obj_new);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -106,6 +108,19 @@ function handler_default_( /* ... */ ) {
 
 //-------------------------------------------------------------------------------------------------
 	
+function l_toBigInt_(obj_labels, obj, ignore= false) {
+	console.assert(obj_labels !== undefined, 'no labels initialized');
+	let bigInt = BigInt(0);
+	for (const [k,v] of Object.entries(obj)) {
+		if ( ( ignore || v ) && obj_labels[k])
+			bigInt|= BigInt( obj_labels[k] );			
+		// console.log('0b'+ bigInt.toString(2) );
+	}
+	return bigInt;
+}
+
+// console.log(l_toBigInt_({},{}))
+
 class LOGR {
 	constructor() {
 		this._handler_log= handler_default_;
@@ -166,6 +181,7 @@ class LOGR {
 
 export { 
 	LOGR, 
+	l_length_ as l_length,
 	l_array_ as l_array,
 	l_concat_ as l_concat,
 	l_merge_ as l_merge,
