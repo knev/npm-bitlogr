@@ -1,5 +1,4 @@
 
-// import { LOGR } from '@knev/bitlogr';
 import { LOGR } from '../src/logr.mjs';
 
 let LOGR_ = LOGR.instance();
