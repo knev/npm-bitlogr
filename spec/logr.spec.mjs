@@ -653,13 +653,86 @@ describe("LOGR and helper Functions;", () => {
 
 	});
 
-	// TODO: 
-	// We can achieve this using a build-time transformation that replaces LOGR_.log(...) calls with a no-op statement. 
-	// Here’s how: 1. Use a Build Tool with Code Transformation
-	// We’ll leverage a tool like Babel with a custom plugin to rewrite LOGR_.log(...) calls in production. 
-	// This is the closest JavaScript equivalent to a C++ macro.
-	// 2. Babel Plugin to Strip log Calls
-	// Create a custom Babel plugin to remove LOGR_.log(...) calls in production:
+	describe("performance;", () => {
+		beforeEach(() => {
+			// Spy on console.log before each test
+			spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
+
+			// Forcefully set LOGR_ENABLED to false for these tests
+			Object.defineProperty(global, 'LOGR_ENABLED', {
+				value: false,
+				writable: true,
+				configurable: true
+			});
+		});
+	
+		afterEach(() => {
+			// Reset the spy after each test to avoid interference
+			console.log.calls.reset();
+
+			// Clean up to avoid affecting other tests
+			delete global.LOGR_ENABLED;
+		});		
+	
+		it("NOP", () => {
+			const fxn_empty = function() {
+				// Empty function (NOP)
+			}
+	
+			const LOGR_= LOGR.instance();
+			const l_= {
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			}
+			LOGR_.labels= l_;
+			LOGR_.toggled= {
+				// DEL : true
+			}
+
+			const log_= LOGR_.log;	
+			const fxn_log = function () {
+				return log_(l_.DEL | l_.CXNS, () => ["this message should not log", JSON.stringify(LOGR_.labels)]);
+			};
+
+			const result = fxn_log();
+			expect(result).toBe(undefined);
+			expect(console.log).not.toHaveBeenCalledWith("this message should not log", jasmine.any(String)); // Verify no logging	
+	
+			// Warm-up runs to avoid JIT compilation skewing results
+			for (let i = 0; i < 1000; i++) {
+				fxn_empty();
+				fxn_log();
+			}
+	
+			// Measure empty function performance
+			const start_empty = performance.now();
+			for (let i = 0; i < 1000000000; i++) {
+				fxn_empty();
+			}
+			const end_empty = performance.now();
+			const t_empty = end_empty - start_empty;
+	
+			// Measure logging function performance
+			const start_log = performance.now();
+			for (let i = 0; i < 1000000000; i++) {
+				fxn_log();
+			}
+			const end_log = performance.now();
+			const t_log = end_log - start_log;
+	
+			// Calculate and log results
+			const difference = t_log - t_empty;
+			const percentSlower = ((t_log - t_empty) / t_empty * 100).toFixed(2);
+	
+			console.log(`Empty function time: ${t_empty.toFixed(2)}ms`);
+			console.log(`Logging function time: ${t_log.toFixed(2)}ms`);
+			console.log(`Difference: ${difference.toFixed(2)}ms`);
+			console.log(`Logging function is ${percentSlower}% slower`);
+	
+			// Basic assertion to ensure test passes
+			expect(true).toBe(true);
+		});
+	});
 
 	describe('Object.defineProperty(global, \'LOGR_ENABLED\', {});', () => {
 		let LOGR_;
@@ -767,87 +840,6 @@ describe("LOGR and helper Functions;", () => {
 
 				expect(result).toBe(undefined);
 			});
-		});
-	});
-
-	describe("performance;", () => {
-		beforeEach(() => {
-			// Spy on console.log before each test
-			spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
-
-			// Forcefully set LOGR_ENABLED to false for these tests
-			Object.defineProperty(global, 'LOGR_ENABLED', {
-				value: false,
-				writable: true,
-				configurable: true
-			});
-		});
-	
-		afterEach(() => {
-			// Reset the spy after each test to avoid interference
-			console.log.calls.reset();
-
-			// Clean up to avoid affecting other tests
-			delete global.LOGR_ENABLED;
-		});		
-	
-		it("NOP", () => {
-			const fxn_empty = function() {
-				// Empty function (NOP)
-			}
-	
-			const LOGR_= LOGR.instance();
-			const l_= {
-				DEL : 0b1 << 0,		// removed
-				CXNS : 0b1 << 2,	// connections
-			}
-			LOGR_.labels= l_;
-			LOGR_.toggled= {
-				// DEL : true
-			}
-
-			const log_= LOGR_.log;	
-			const fxn_log = function () {
-				return log_(l_.DEL | l_.CXNS, () => ["this message should not log", JSON.stringify(LOGR_.labels)]);
-			};
-
-			const result = fxn_log();
-			expect(result).toBe(undefined);
-			expect(console.log).not.toHaveBeenCalledWith("this message should not log", jasmine.any(String)); // Verify no logging	
-	
-			// Warm-up runs to avoid JIT compilation skewing results
-			for (let i = 0; i < 1000; i++) {
-				fxn_empty();
-				fxn_log();
-			}
-	
-			// Measure empty function performance
-			const start_empty = performance.now();
-			for (let i = 0; i < 1000000000; i++) {
-				fxn_empty();
-			}
-			const end_empty = performance.now();
-			const t_empty = end_empty - start_empty;
-	
-			// Measure logging function performance
-			const start_log = performance.now();
-			for (let i = 0; i < 1000000000; i++) {
-				fxn_log();
-			}
-			const end_log = performance.now();
-			const t_log = end_log - start_log;
-	
-			// Calculate and log results
-			const difference = t_log - t_empty;
-			const percentSlower = ((t_log - t_empty) / t_empty * 100).toFixed(2);
-	
-			console.log(`Empty function time: ${t_empty.toFixed(2)}ms`);
-			console.log(`Logging function time: ${t_log.toFixed(2)}ms`);
-			console.log(`Difference: ${difference.toFixed(2)}ms`);
-			console.log(`Logging function is ${percentSlower}% slower`);
-	
-			// Basic assertion to ensure test passes
-			expect(true).toBe(true);
 		});
 	});
 
