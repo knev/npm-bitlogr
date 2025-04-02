@@ -9,8 +9,10 @@ const l_= {
 }
 LOGR_.labels= l_;
 
+const local_log_ = LOGR_.log;
+
 function log_as_member() {
-	LOGR_.log(l_.EVENTS, "module: log_as_member(): log of an EVENT");
+	local_log_(l_.EVENTS, () => ["module: log_as_member(): log of an EVENT"]);
 }
 
 export {

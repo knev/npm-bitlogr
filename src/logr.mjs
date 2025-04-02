@@ -130,9 +130,15 @@ const LOGR = (function () {
 		let _obj_labels = undefined;
 		let _Bint_toggled = BigInt(0);
 
-		// Define a standalone NOP function
-		const _nopLog = () => { };
-		let _log_fxn = _nopLog; // Default to standalone NOP
+		function _log_fxn(nr_logged, argsFn /* args */) {
+			if ((BigInt(nr_logged) & _Bint_toggled) === BigInt(0))
+				return false;
+
+			const args = argsFn();
+			_handler_log.apply(this, args);
+			// _handler_log.apply(this, args);
+			return true;
+		}
 
 		return {
 			set handler(fx) {
@@ -157,20 +163,6 @@ const LOGR = (function () {
 			get toggled() { return _Bint_toggled; },
 			set toggled(obj_toggled) {
 				_Bint_toggled= l_toBigInt_(_obj_labels, obj_toggled);
-				if (_Bint_toggled === BigInt(0)) {
-					_log_fxn = _nopLog; // Reset to lightweight NOP
-					return;
-				}
-
-				const self = this; // Avoid repeated 'this' lookups
-				_log_fxn = function (nr_logged, argsFn) {
-					if ((BigInt(nr_logged) & _Bint_toggled) === BigInt(0))
-						return false;
-
-					const args = argsFn();
-					_handler_log.apply(self, args);
-					return true;
-				}
 			},
 
 			log(nr_logged, argsFn) {

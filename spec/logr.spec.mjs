@@ -565,13 +565,13 @@ describe("LOGR and helper Functions;", () => {
 			local_LOGR_.handler = defaultHandler; // Set known good handler
 			local_LOGR_.labels = module_l_; // Baseline
 			local_LOGR_.toggled = {};
-			console.log("two LOGRs beforeAll: Handler reset, labels set to module_l");
+			// console.log("two LOGRs beforeAll: Handler reset, labels set to module_l");
 		});
 	
 		beforeEach(() => {
 			local_LOGR_= LOGR.instance();
 			local_LOGR_.handler = defaultHandler; // Ensure handler per test
-			consoleSpy = spyOn(console, "log").and.callThrough();
+			consoleSpy = spyOn(console, "log"); //.and.callThrough();
 		});
 
 		afterEach(() => {
@@ -585,7 +585,7 @@ describe("LOGR and helper Functions;", () => {
 				DEL : true
 			};
 
-			local_LOGR_.log(local_l_.DEL, "local_LOGR_: This should log");
+			local_LOGR_.log(local_l_.DEL, () => ["local_LOGR_: This should log"]);
 			expect(consoleSpy).toHaveBeenCalledWith("local_LOGR_: This should log");
 		});
 
@@ -604,7 +604,7 @@ describe("LOGR and helper Functions;", () => {
 				DEL : true
 			};
 
-			module_LOGR_.log(local_l_.DEL, "local module_LOGR_: This should NOT log");
+			module_LOGR_.log(local_l_.DEL, () => ["local module_LOGR_: This should NOT log"]);
 			expect(consoleSpy).not.toHaveBeenCalledWith("local module_LOGR_: This should NOT log");
 		});
 
@@ -621,7 +621,7 @@ describe("LOGR and helper Functions;", () => {
 				DEL : true
 			};
 
-			module_LOGR_.log(local_l_.DEL, "local module_LOGR_: This should log");
+			module_LOGR_.log(local_l_.DEL, () => ["local module_LOGR_: This should log"]);
 			expect(consoleSpy).toHaveBeenCalledWith("local module_LOGR_: This should log");
 		});
 
@@ -661,14 +661,16 @@ describe("LOGR and helper Functions;", () => {
 	// 2. Babel Plugin to Strip log Calls
 	// Create a custom Babel plugin to remove LOGR_.log(...) calls in production:
 
-	describe('LOGR_ENABLED;', () => {
+	describe('Object.defineProperty(global, \'LOGR_ENABLED\', {});', () => {
 		let LOGR_;
+		let l_;
 		let handlerSpy;
 
 		beforeEach(() => {
 			// Reset the singleton instance before each test
 			LOGR_ = LOGR.instance();
-			LOGR_.labels = l_array(['a', 'b', 'c']); // { a: 1, b: 2, c: 4 }
+			l_= l_array(['A', 'B', 'C']); // { A: 1, B: 2, C: 4 }
+			LOGR_.labels = l_;
 			handlerSpy = jasmine.createSpy('handler');
 			LOGR_.handler = handlerSpy;
 		});
@@ -696,23 +698,23 @@ describe("LOGR and helper Functions;", () => {
 			});
 		
 			it('should call the handler when toggled bits match', () => {
-				LOGR_.toggled = { a: true, b: true }; // toggled = 0b011 (3)
-				LOGR_.log(2, () => ['test message', 'extra arg']); // nr_logged = 2 (0b010)
+				LOGR_.toggled = { A: true, B: true }; // toggled = 0b011 (3)
+				LOGR_.log(l_.B, () => ['test message', 'extra arg']); // nr_logged = 2 (0b010)
 
 				expect(handlerSpy).toHaveBeenCalledWith('test message', 'extra arg');
 			});
 
 			it('should not call the handler when toggled bits do not match', () => {
-				LOGR_.toggled = { a: true }; // toggled = 0b001 (1)
-				LOGR_.log(2, () => ['test message']); // nr_logged = 2 (0b010)
+				LOGR_.toggled = { A: true }; // toggled = 0b001 (1)
+				LOGR_.log(l_.B, () => ['test message']); // nr_logged = 2 (0b010)
 
 				expect(handlerSpy).not.toHaveBeenCalled();
 			});
 
 			it('should evaluate argsFn only when logging occurs', () => {
 				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['computed message']);
-				LOGR_.toggled = { a: true, b: true }; // toggled = 0b011 (3)
-				LOGR_.log(1, argsSpy); // nr_logged = 1 (0b001)
+				LOGR_.toggled = { A: true, B: true }; // toggled = 0b011 (3)
+				LOGR_.log(l_.A, argsSpy); // nr_logged = 1 (0b001)
 
 				expect(argsSpy).toHaveBeenCalled(); // argsFn was evaluated
 				expect(handlerSpy).toHaveBeenCalledWith('computed message');
@@ -720,8 +722,8 @@ describe("LOGR and helper Functions;", () => {
 
 			it('should not evaluate argsFn when logging is skipped', () => {
 				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['computed message']);
-				LOGR_.toggled = { a: true }; // toggled = 0b001 (1)
-				LOGR_.log(2, argsSpy); // nr_logged = 2 (0b010)
+				LOGR_.toggled = { A: true }; // toggled = 0b001 (1)
+				LOGR_.log(l_.B, argsSpy); // nr_logged = 2 (0b010)
 
 				expect(argsSpy).not.toHaveBeenCalled(); // argsFn was not evaluated
 				expect(handlerSpy).not.toHaveBeenCalled();
@@ -744,31 +746,31 @@ describe("LOGR and helper Functions;", () => {
 			});
 		
 			it('should not call the handler even when toggled bits match', () => {
-				LOGR_.toggled = { a: true, b: true }; // toggled = 0b011 (3)
-				LOGR_.log(2, () => ['test message', 'extra arg']); // nr_logged = 2 (0b010)
+				LOGR_.toggled = { A: true, B: true }; // toggled = 0b011 (3)
+				LOGR_.log(l_.B, () => ['test message', 'extra arg']); // nr_logged = 2 (0b010)
 
 				expect(handlerSpy).not.toHaveBeenCalled();
 			});
 
 			it('should not evaluate argsFn at all', () => {
 				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['expensive computation']);
-				LOGR_.toggled = { a: true, b: true }; // toggled = 0b011 (3)
-				LOGR_.log(2, argsSpy); // nr_logged = 2 (0b010)
+				LOGR_.toggled = { A: true, B: true }; // toggled = 0b011 (3)
+				LOGR_.log(l_.B, argsSpy); // nr_logged = 2 (0b010)
 
 				expect(argsSpy).not.toHaveBeenCalled(); // No evaluation in prod
 				expect(handlerSpy).not.toHaveBeenCalled();
 			});
 
-			it('should return false from log method', () => {
-				LOGR_.toggled = { a: true, b: true }; // toggled = 0b011 (3)
-				const result = LOGR_.log(2, () => ['test message']);
+			it('should return undefined from log method', () => {
+				LOGR_.toggled = { A: true, B: true }; // toggled = 0b011 (3)
+				const result = LOGR_.log(l_.B, () => ['test message']);
 
-				expect(result).toBe(false);
+				expect(result).toBe(undefined);
 			});
 		});
 	});
 
-	fdescribe("performance;", () => {
+	describe("performance;", () => {
 		beforeEach(() => {
 			// Spy on console.log before each test
 			spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
@@ -804,9 +806,10 @@ describe("LOGR and helper Functions;", () => {
 				// DEL : true
 			}
 
-			const fxn_log = function() {
-				return LOGR_.log(l_.DEL | l_.CXNS, () => ["this message should not log", JSON.stringify(LOGR_.labels)]);
-			}
+			const log_= LOGR_.log;	
+			const fxn_log = function () {
+				return log_(l_.DEL | l_.CXNS, () => ["this message should not log", JSON.stringify(LOGR_.labels)]);
+			};
 
 			const result = fxn_log();
 			expect(result).toBe(undefined);
