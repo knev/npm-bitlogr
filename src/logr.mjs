@@ -6,6 +6,12 @@ const __name = obj => Object.keys(obj)[0];
 //-------------------------------------------------------------------------------------------------
 
 function l_length_(obj_labels) {
+    if (! obj_labels || typeof obj_labels !== 'object') 
+		throw new Error('obj_labels must be an object');
+    const obj_1label = Object.values(obj_labels);
+    if (! obj_1label.every(v => typeof v === 'number' && Number.isFinite(v))) 
+		throw new Error('All values must be finite numbers');
+
     const labels = Object.values(obj_labels);
     if (labels.length === 0) 
 		return 1; // Empty object case, start at 1
@@ -18,6 +24,11 @@ function l_length_(obj_labels) {
 }
 
 function l_array_(arr_labels, start = 1) {
+	if (! Array.isArray(arr_labels)) 
+		throw new Error('arr_labels must be an array');
+    if (! Number.isSafeInteger(start) || start < 0) 
+		throw new Error('start must be a safe, non-negative integer');
+
     return Object.freeze(arr_labels.reduce((acc, key, index) => {
         acc[key] = start << index;
         return acc;
@@ -25,6 +36,14 @@ function l_array_(arr_labels, start = 1) {
 }
 
 function l_concat_(obj_labels, arg) {
+    if (! obj_labels || typeof obj_labels !== 'object') 
+		throw new Error('obj_labels must be an object');
+    const obj_1label = Object.values(obj_labels);
+    if (! obj_1label.every(v => typeof v === 'number' && Number.isFinite(v))) 
+		throw new Error('All values must be finite numbers');
+    if (! arg || (typeof arg !== 'object' && ! Array.isArray(arg))) 
+		throw new Error('arg must be an object or array');
+
 	if (Array.isArray(arg)) {
 		const len = l_length_(obj_labels);
 		const arr_labels_new = l_array_(arg, len);
@@ -32,12 +51,20 @@ function l_concat_(obj_labels, arg) {
 	}
 
 	const next_pos = l_length_(obj_labels);
-	const result = { ...obj_labels };
 	const arg_entries = Object.entries(arg);
+    const result = Object.create(null);
+    Object.entries(obj_labels).forEach(([k, v]) => {
+        if (k !== '__proto__' && k !== 'constructor') 
+			result[k] = v;
+    });
 
 	let min_arg = Infinity;
 	for (const [, value] of arg_entries) {
-		if (value > 0 && value < min_arg) min_arg = value;
+		if (typeof value !== 'number' || ! Number.isFinite(value)) 
+			continue; // Skip non-numeric
+
+		if (value > 0 && value < min_arg) 
+			min_arg = value;
 	}
     // Shift only if min_arg is less than next_pos
     const shift = min_arg === Infinity || min_arg >= next_pos 
@@ -54,7 +81,22 @@ function l_concat_(obj_labels, arg) {
 }
 
 function l_merge_(obj_labels1, obj_labels2) {
-    const result = { ...obj_labels1 }; // Start with first set unchanged
+    if (! obj_labels1 || typeof obj_labels1 !== 'object') 
+		throw new Error('obj_labels must be an object');
+    const obj_1label1 = Object.values(obj_labels1);
+    if (! obj_1label1.every(v => typeof v === 'number' && Number.isFinite(v))) 
+		throw new Error('All values must be finite numbers');
+
+	if (! obj_labels2 || typeof obj_labels2 !== 'object') 
+		throw new Error('obj_labels must be an object');
+    const obj_1label2 = Object.values(obj_labels2);
+    if (! obj_1label2.every(v => typeof v === 'number' && Number.isFinite(v))) 
+		throw new Error('All values must be finite numbers');
+
+    const result = Object.create(null);
+    Object.entries(obj_labels1).forEach(([k, v]) => {
+        if (k !== '__proto__' && k !== 'constructor') result[k] = v;
+    });	
     const set_values = new Set(Object.values(obj_labels1)); // Track all used bit values
     
     // Find the highest bit position to start shifting from if needed
@@ -65,18 +107,21 @@ function l_merge_(obj_labels1, obj_labels2) {
     for (const [key, value] of Object.entries(obj_labels2)) {
         if (key in result) {
             // Same key: Values must match
-            console.assert(
-                result[key] === value,
-                `Key '${key}' has conflicting values: ${result[key]} (obj_labels1) vs ${value} (obj_labels2)`
-            );
+            if (result[key] !== value) {
+                throw new Error(`Key '${key}' has conflicting values: ${result[key]} (obj_labels1) vs ${value} (obj_labels2)`);
+            }
             // No action needed if values match, already in result
         } else {
+			let maxIterations = 1000;
             // New key: Add if value is unique, otherwise shift
             let value_new = value;
-            while (set_values.has(value_new)) {
+            while (set_values.has(value_new) && maxIterations--) {
                 value_new = 1 << next_shift++;
             }
-            result[key] = value_new;
+			if (maxIterations <= 0) 
+				throw new Error('Too many collisions in l_merge_');
+            
+			result[key] = value_new;
             set_values.add(value_new);
         }
     }
@@ -85,16 +130,32 @@ function l_merge_(obj_labels1, obj_labels2) {
 }
 
 function l_LL_(obj, x) {
+	if (! obj || typeof obj !== 'object') 
+		throw new Error('obj must be an object');
+	if (! Number.isSafeInteger(x) || x < 0) 
+		throw new Error('Shift value must be a safe, non-negative integer');
+
 	const obj_new= {}
-	for (const [k,v] of Object.entries(obj))
-		obj_new[k]= v<<x;
+	for (const [k,v] of Object.entries(obj)) {
+		if (typeof v !== 'number' || ! Number.isFinite(v)) 
+			continue; // Skip non-numeric
+		obj_new[k] = v<<x;
+	}
 	return Object.freeze(obj_new);
 }
 
 function l_RR_(obj, x) {
+	if (! obj || typeof obj !== 'object') 
+		throw new Error('obj must be an object');
+	if (! Number.isSafeInteger(x) || x < 0) 
+		throw new Error('Shift value must be a safe, non-negative integer');
+
 	const obj_new= {}
-	for (const [k,v] of Object.entries(obj))
-		obj_new[k]= v>>x;
+	for (const [k,v] of Object.entries(obj)) {
+		if (typeof v !== 'number' || ! Number.isFinite(v)) 
+			continue; // Skip non-numeric
+        obj_new[k] = v>>x;
+	}
 	return Object.freeze(obj_new);
 }
 
@@ -109,10 +170,14 @@ function handler_default_( /* ... */ ) {
 //-------------------------------------------------------------------------------------------------
 	
 function l_toBigInt_(obj_labels, obj, ignore= false) {
-	console.assert(obj_labels !== undefined, 'no labels initialized');
+    if (! obj_labels || typeof obj_labels !== 'object') 
+		throw new Error('obj_labels must be an object');
+    if (! obj || typeof obj !== 'object') 
+		throw new Error('obj must be an object');
+
 	let bigInt = BigInt(0);
 	for (const [k,v] of Object.entries(obj)) {
-		if ( ( ignore || v ) && obj_labels[k])
+		if ( ( ignore || v ) && obj_labels[k] !== undefined && typeof obj_labels[k] === 'number')
 			bigInt|= BigInt( obj_labels[k] );			
 		// console.log('0b'+ bigInt.toString(2) );
 	}

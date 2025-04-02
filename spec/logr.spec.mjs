@@ -308,13 +308,11 @@ describe("LOGR and helper Functions;", () => {
 			});
 
 			it('should throw error for same keys with different values', () => {
-				spyOn(console, "assert");
 				const l1 = { A: 0b1 << 3 }; // A: 8
 				const l2 = { A: 0b1 << 4 }; // A: 16 (different value)
-				l_merge(l1, l2);
-				expect(console.assert).toHaveBeenCalledWith(false, 
-					"Key 'A' has conflicting values: 8 (obj_labels1) vs 16 (obj_labels2)"
-				)
+				expect(() => {
+					l_merge(l1, l2);
+				}).toThrowError(Error, "Key 'A' has conflicting values: 8 (obj_labels1) vs 16 (obj_labels2)");
 			});
 
 		});
@@ -474,16 +472,14 @@ describe("LOGR and helper Functions;", () => {
 		it("should initialize with default values", () => {
 			expect(LOGR_.labels).toBe(module_l_); // because it is a singleton class
 			expect(LOGR_.toggled).toBe(0n);
-
-			spyOn(console, "assert");
-			LOGR_.labels= undefined;
+		
+			LOGR_.labels = undefined;
 			expect(() => {
-				LOGR_.toggled= {
-					DEL : true,
-					// CXNS : true
-				}
-			}).toThrowError(TypeError, /Cannot read properties of undefined \(reading 'DEL'\)/);
-			expect(console.assert).toHaveBeenCalledWith(false, 'no labels initialized')
+				LOGR_.toggled = {
+					DEL: true,
+					// CXNS: true
+				};
+			}).toThrowError(Error, "obj_labels must be an object");
 		});
 
 		it("should verify the handler changes when explicitly overridden", () => {
