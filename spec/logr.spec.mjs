@@ -512,11 +512,11 @@ describe("LOGR and helper Functions;", () => {
 				// CXNS : true
 			};
 
-			LOGR_.log(l_.DEL, 'DEL message');
+			LOGR_.log(l_.DEL, () => ['DEL message']);
 			expect(handlerSpy).toHaveBeenCalledWith('DEL message');
 	
 			handlerSpy.calls.reset();
-			LOGR_.log(l_.CXNS, 'CXNS message');
+			LOGR_.log(l_.CXNS, () => ['CXNS message']);
 			expect(handlerSpy).not.toHaveBeenCalled(); // No match
 	
 			LOGR_.toggled= { 
@@ -524,23 +524,23 @@ describe("LOGR and helper Functions;", () => {
 				CXNS : true
 			};
 	
-			LOGR_.log(l_.DEL, 'DEL message again');
+			LOGR_.log(l_.DEL, () => ['DEL message again']);
 			expect(handlerSpy).not.toHaveBeenCalled(); // No match
 	
 			handlerSpy.calls.reset();
-			LOGR_.log(l_.CXNS, 'CXNS message again');
+			LOGR_.log(l_.CXNS, () => ['CXNS message again']);
 			expect(handlerSpy).toHaveBeenCalledWith('CXNS message again');
 
 			// should log to console with default handler when toggled matches with OR
 			handlerSpy.calls.reset();
-			LOGR_.log(l_.DEL | l_.CXNS, 'CXNS message again');
+			LOGR_.log(l_.DEL | l_.CXNS, () => ['CXNS message again']);
 			expect(handlerSpy).toHaveBeenCalledWith('CXNS message again');
 
 			// should reset _log_fxn to NOP when toggled is cleared
 			LOGR_.toggled = {};
 	
 			handlerSpy.calls.reset();
-			LOGR_.log(l_.DEL, 'NOP message');
+			LOGR_.log(l_.DEL, () => ['NOP message']);
 			expect(handlerSpy).not.toHaveBeenCalled(); // Back to NOP
 		});
 	
@@ -661,34 +661,156 @@ describe("LOGR and helper Functions;", () => {
 	// 2. Babel Plugin to Strip log Calls
 	// Create a custom Babel plugin to remove LOGR_.log(...) calls in production:
 
-	describe("performance;", () => {
+	describe('LOGR_ENABLED;', () => {
+		let LOGR_;
+		let handlerSpy;
+
+		beforeEach(() => {
+			// Reset the singleton instance before each test
+			LOGR_ = LOGR.instance();
+			LOGR_.labels = l_array(['a', 'b', 'c']); // { a: 1, b: 2, c: 4 }
+			handlerSpy = jasmine.createSpy('handler');
+			LOGR_.handler = handlerSpy;
+		});
+
+		describe('Development Mode (LOGR_ENABLED = true)', () => {
+			// beforeEach(() => {
+			// 	// Simulate dev mode by ensuring LOGR_ENABLED is true
+			// 	// In a real build, this would be set by Webpack DefinePlugin/ rollup
+			// 	if (typeof LOGR_ENABLED === 'undefined') {
+			// 		global.LOGR_ENABLED = true; // Fallback for testing
+			// 	}
+			// });
+			beforeEach(() => {
+				// Forcefully set LOGR_ENABLED to false for these tests
+				Object.defineProperty(global, 'LOGR_ENABLED', {
+					value: true,
+					writable: true,
+					configurable: true
+				});
+			});
+
+			afterEach(() => {
+				// Clean up to avoid affecting other tests
+				delete global.LOGR_ENABLED;
+			});
+		
+			it('should call the handler when toggled bits match', () => {
+				LOGR_.toggled = { a: true, b: true }; // toggled = 0b011 (3)
+				LOGR_.log(2, () => ['test message', 'extra arg']); // nr_logged = 2 (0b010)
+
+				expect(handlerSpy).toHaveBeenCalledWith('test message', 'extra arg');
+			});
+
+			it('should not call the handler when toggled bits do not match', () => {
+				LOGR_.toggled = { a: true }; // toggled = 0b001 (1)
+				LOGR_.log(2, () => ['test message']); // nr_logged = 2 (0b010)
+
+				expect(handlerSpy).not.toHaveBeenCalled();
+			});
+
+			it('should evaluate argsFn only when logging occurs', () => {
+				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['computed message']);
+				LOGR_.toggled = { a: true, b: true }; // toggled = 0b011 (3)
+				LOGR_.log(1, argsSpy); // nr_logged = 1 (0b001)
+
+				expect(argsSpy).toHaveBeenCalled(); // argsFn was evaluated
+				expect(handlerSpy).toHaveBeenCalledWith('computed message');
+			});
+
+			it('should not evaluate argsFn when logging is skipped', () => {
+				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['computed message']);
+				LOGR_.toggled = { a: true }; // toggled = 0b001 (1)
+				LOGR_.log(2, argsSpy); // nr_logged = 2 (0b010)
+
+				expect(argsSpy).not.toHaveBeenCalled(); // argsFn was not evaluated
+				expect(handlerSpy).not.toHaveBeenCalled();
+			});
+		});
+
+		describe('Production Mode (LOGR_ENABLED = false)', () => {
+			beforeEach(() => {
+				// Forcefully set LOGR_ENABLED to false for these tests
+				Object.defineProperty(global, 'LOGR_ENABLED', {
+					value: false,
+					writable: true,
+					configurable: true
+				});
+			});
+		
+			afterEach(() => {
+				// Clean up to avoid affecting other tests
+				delete global.LOGR_ENABLED;
+			});
+		
+			it('should not call the handler even when toggled bits match', () => {
+				LOGR_.toggled = { a: true, b: true }; // toggled = 0b011 (3)
+				LOGR_.log(2, () => ['test message', 'extra arg']); // nr_logged = 2 (0b010)
+
+				expect(handlerSpy).not.toHaveBeenCalled();
+			});
+
+			it('should not evaluate argsFn at all', () => {
+				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['expensive computation']);
+				LOGR_.toggled = { a: true, b: true }; // toggled = 0b011 (3)
+				LOGR_.log(2, argsSpy); // nr_logged = 2 (0b010)
+
+				expect(argsSpy).not.toHaveBeenCalled(); // No evaluation in prod
+				expect(handlerSpy).not.toHaveBeenCalled();
+			});
+
+			it('should return false from log method', () => {
+				LOGR_.toggled = { a: true, b: true }; // toggled = 0b011 (3)
+				const result = LOGR_.log(2, () => ['test message']);
+
+				expect(result).toBe(false);
+			});
+		});
+	});
+
+	fdescribe("performance;", () => {
 		beforeEach(() => {
 			// Spy on console.log before each test
 			spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
+
+			// Forcefully set LOGR_ENABLED to false for these tests
+			Object.defineProperty(global, 'LOGR_ENABLED', {
+				value: false,
+				writable: true,
+				configurable: true
+			});
 		});
 	
 		afterEach(() => {
 			// Reset the spy after each test to avoid interference
 			console.log.calls.reset();
-		});
+
+			// Clean up to avoid affecting other tests
+			delete global.LOGR_ENABLED;
+		});		
 	
 		it("NOP", () => {
 			const fxn_empty = function() {
 				// Empty function (NOP)
 			}
 	
-			// Store log function locally
 			const LOGR_= LOGR.instance();
 			const l_= {
 				DEL : 0b1 << 0,		// removed
 				CXNS : 0b1 << 2,	// connections
 			}
 			LOGR_.labels= l_;
-			LOGR_.toggled= {}
+			LOGR_.toggled= {
+				// DEL : true
+			}
 
 			const fxn_log = function() {
-				LOGR_.log(l_.DEL | l_.CXNS, "this message should not log", JSON.stringify(LOGR_.labels));
+				return LOGR_.log(l_.DEL | l_.CXNS, () => ["this message should not log", JSON.stringify(LOGR_.labels)]);
 			}
+
+			const result = fxn_log();
+			expect(result).toBe(undefined);
+			expect(console.log).not.toHaveBeenCalledWith("this message should not log", jasmine.any(String)); // Verify no logging	
 	
 			// Warm-up runs to avoid JIT compilation skewing results
 			for (let i = 0; i < 1000; i++) {
@@ -724,7 +846,6 @@ describe("LOGR and helper Functions;", () => {
 			// Basic assertion to ensure test passes
 			expect(true).toBe(true);
 		});
-	
 	});
 
 });

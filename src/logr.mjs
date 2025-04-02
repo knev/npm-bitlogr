@@ -157,27 +157,32 @@ const LOGR = (function () {
 			get toggled() { return _Bint_toggled; },
 			set toggled(obj_toggled) {
 				_Bint_toggled= l_toBigInt_(_obj_labels, obj_toggled);
-
 				if (_Bint_toggled === BigInt(0)) {
-					_log_fxn = () => { }; // Reset to lightweight NOP
+					_log_fxn = _nopLog; // Reset to lightweight NOP
 					return;
 				}
 
 				const self = this; // Avoid repeated 'this' lookups
-				_log_fxn = function (nr_logged, /* ... */) {
+				_log_fxn = function (nr_logged, argsFn) {
 					if ((BigInt(nr_logged) & _Bint_toggled) === BigInt(0))
 						return false;
 
-					var args = Array.prototype.slice.call(arguments);
-					args.shift(); // remove first arg: nr_logged
+					const args = argsFn();
 					_handler_log.apply(self, args);
-
 					return true;
 				}
 			},
 
-			log(nr_logged, /* ... */) {
-                return _log_fxn.apply(this, arguments);
+			log(nr_logged, argsFn) {
+				// Ensure LOGR_ENABLED is defined (for testing purposes)
+				if (typeof LOGR_ENABLED === 'undefined') {
+					console.warn('LOGR_ENABLED not defined, defaulting to true');
+					global.LOGR_ENABLED = true;
+				}
+				if (! LOGR_ENABLED) 
+					return undefined;
+				
+                return _log_fxn.call(this, nr_logged, argsFn); // Pass the thunk
             }
 		};
 	}
