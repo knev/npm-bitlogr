@@ -1,8 +1,17 @@
 
-- NOP function when when flags are not toggled
+
+Write the README.md in markdown for my project 
+USPs:
 - no label dependency between compilation units
 - each unit can ignore, inherit, overwrite or rename sub unit labels
 - can specify a custom logging handler
+- no performance hit because thunk is used,
+
+explain that it is a singleton class. explain how to init the LOGR with labels and toggle. what is the different formats of labels and toggles; how they conside with the bits. explain that the format of a log statement should look like. when the log function returns true, false or undefined.
+explain how a static function can be used to increase performance instead of LOGR.log.
+should explain with examples how to use the l_xxxx utility/helper functions.
+examples for how to set the labels. how to set the labels when importing labels from submodules. how to use the OR for labels in logs statements. 
+explain how to use it in dev and in production. 
 
 
 v0 to v1
