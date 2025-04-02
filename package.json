@@ -13,6 +13,8 @@
 	"scripts": {
 		"build": "rollup --config",
 		"test": "jasmine",
+		"test-dev": "NODE_ENV=development rollup -c && TEST_MODE=dev npx jasmine spec/build.mjs",
+		"test-prod": "NODE_ENV=production rollup -c && TEST_MODE=prod npx jasmine spec/build.mjs",
 		"clean": "del-cli dist && echo OK"
 	},
 	"repository": {
@@ -26,8 +28,10 @@
 	},
 	"homepage": "https://github.com/knev/npm-bitlogr.git#readme",
 	"devDependencies": {
+		"@rollup/plugin-replace": "^6.0.2",
+		"@rollup/plugin-terser": "^0.4.4",
 		"del-cli": "^6.0.0",
 		"jasmine": "^5.6.0",
-		"rollup": "^4.38.0"
+		"rollup": "^4.39.0"
 	}
 }
