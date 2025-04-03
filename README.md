@@ -140,13 +140,6 @@ const l_shifted_ = l_RR(l_, 2); // { A: 1, B: 2 }
 
 ## Examples
 
-### Setting Labels
-```javascript
-// Simple label set
-const l_ = l_array(['EVENT', 'CXNS']);
-LOGR_.labels = l_;
-```
-
 ### Importing Labels from Submodules
 ```javascript
 import { l as l_subm_ } from './submodule.mjs'; // e.g., { EVENTS: 8, HANDLERS: 16 }
@@ -155,6 +148,41 @@ const l_local_ = l_array(['EVENT', 'CXNS']); // { EVENT: 1, CXNS: 2 }
 const l_= l_merge(l_subm_, l_local_); // { EVENTS: 8, HANDLERS: 16, EVENT: 1, CXNS: 2 }
 
 LOGR_.labels = l_;
+```
+
+### Label Reassignment and Toggling Example
+
+This section demonstrates the proper way to reassign labels and manage toggled states in the module.
+
+```javascript
+import { l as module_l_, log_as_member } from './module.mjs';
+
+// Reassign label values in submodule
+Object.assign(module_l_, l_array(['EVENTS', 'HANDLERS']));
+
+// Update the local labels to include the reassignment
+const l_ = l_concat(module_l_, ['DEL', 'MORE_EVENTS']);
+
+// Updating the labels; ZEROS OUT TOGGLED!
+local_LOGR_.labels = l_;
+
+// Set the desired toggled states
+local_LOGR_.toggled = {
+    // EVENTS: 0b1 << 0,
+    MORE_EVENTS: 0b1 << 3,  // connections
+};
+
+// This should NOT fire, because EVENTS is not toggled
+log_as_member();
+
+// Set different toggled states
+local_LOGR_.toggled = {
+    EVENTS: 0b1 << 0,
+    // MORE_EVENTS: 0b1 << 3,  // connections
+};
+
+// This should now fire with EVENTS toggled
+log_as_member();
 ```
 
 ### Custom Handler
