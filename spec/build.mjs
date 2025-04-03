@@ -3,13 +3,13 @@
 
 import { LOGR, l_array } from '../dist/logr.es.mjs';
 
-fdescribe('LOGR Logging Behavior', () => {
+describe('LOGR Logging Behavior', () => {
 	let LOGR_;
 	let l_;
 	let handlerSpy;
 
 	beforeEach(() => {
-		LOGR_ = LOGR.instance();
+		LOGR_ = LOGR.get_instance();
 		l_ = l_array(['A', 'B', 'C']); // { A: 1, B: 2, C: 4 };
 		LOGR_.labels = l_;
 
@@ -89,7 +89,7 @@ fdescribe('LOGR Logging Behavior', () => {
 				// Empty function (NOP)
 			}
 	
-			const LOGR_= LOGR.instance();
+			const LOGR_= LOGR.get_instance();
 			const l_= {
 				DEL : 0b1 << 0,		// removed
 				CXNS : 0b1 << 2,	// connections

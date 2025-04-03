@@ -457,7 +457,7 @@ describe("LOGR and helper Functions;", () => {
 		}
 
 		beforeEach(() => {
-			LOGR_= LOGR.instance();
+			LOGR_= LOGR.get_instance();
 			LOGR_.labels= module_l_; // reset the labels back to that of submodule
 
 			// Spy on console.log before each test
@@ -557,15 +557,11 @@ describe("LOGR and helper Functions;", () => {
 		};
 	
 		beforeAll(() => {
-			local_LOGR_ = LOGR.instance();
-			local_LOGR_.handler = defaultHandler; // Set known good handler
-			local_LOGR_.labels = module_l_; // Baseline
-			local_LOGR_.toggled = {};
-			// console.log("two LOGRs beforeAll: Handler reset, labels set to module_l");
 		});
 	
 		beforeEach(() => {
-			local_LOGR_= LOGR.instance();
+			local_LOGR_= LOGR.get_instance();
+			local_LOGR_.labels = module_l_; // Baseline
 			local_LOGR_.handler = defaultHandler; // Ensure handler per test
 			consoleSpy = spyOn(console, "log"); //.and.callThrough();
 		});
@@ -622,29 +618,122 @@ describe("LOGR and helper Functions;", () => {
 		});
 
 		it("reassigning a new name to sub-module keys", () => {
-			const l_= l_array(['EVENTS','HANDLERS','DEL', 'MORE_EVENTS']);
+			expect(module_LOGR_.labels).toEqual({ 
+				EVENTS : 0b1 << 3,
+				HANDLERS : 0b1 << 4,
+			});
+			expect(module_LOGR_.toggled).toEqual(BigInt(0));
+
+			local_LOGR_.toggled= {
+				EVENTS : true
+			};
+			expect(module_LOGR_.toggled).toEqual(BigInt(8));
+
+			log_as_member();
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			consoleSpy.calls.reset();
+
+			// ----
+
+			module_l_.EVENTS = 0b1 << 0;
+			expect(module_l_).toEqual({ 
+				EVENTS : 0b1 << 0,
+				HANDLERS : 0b1 << 4,
+			});
+			// module_LOGR_.labels has changed, because it is equal to structure l_ in the module
+			expect(module_LOGR_.labels).toEqual(module_l_);
+
+			// toggled is still 8n, so this won't fire.
+			log_as_member();
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			consoleSpy.calls.reset();
+
+			// ----
+
+			let l_= l_array(['EVENTS','HANDLERS', 'DEL', 'MORE_EVENTS']);
 			expect(l_).toEqual({ 
 				EVENTS : 0b1 << 0,
 				HANDLERS : 0b1 << 1,
 				DEL : 0b1 << 2,		// removed
 				MORE_EVENTS : 0b1 << 3,	// connections
 			});
+			// updating the labels ZEROS OUT TOGGLED!
 			local_LOGR_.labels= l_;
 
-			// in the module, the labels are a const where EVENTS is EVENTS : 0b1 << 3.
-			// trying to reassing EVENTS to EVENTS : 0b1 << 0 won't work
+			// changing module_l_ now won't change local_LOGR_.labels, since it points to a new object
+			expect(module_l_).toEqual({ 
+				EVENTS : 0b1 << 0,
+				HANDLERS : 0b1 << 4,
+			});
+			module_l_.EVENTS = 0b1 << 3,
+			expect(module_l_).toEqual({ 
+				EVENTS : 0b1 << 3,
+				HANDLERS : 0b1 << 4,
+			});
+			expect(l_).toEqual({ 
+				EVENTS : 0b1 << 0,
+				HANDLERS : 0b1 << 1,
+				DEL : 0b1 << 2,		// removed
+				MORE_EVENTS : 0b1 << 3,	// connections
+			});
+			expect(module_LOGR_.toggled).toEqual(BigInt(0));
 			module_LOGR_.toggled= {
-				EVENTS : true
-			};
-			log_as_member();
-			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+				MORE_EVENTS : 0b1 << 3,	// connections
+			}
+			expect(module_LOGR_.toggled).toEqual(BigInt(8));
 
-			// this fires, because the value of CXNS is 0b1 << 3, which is the same as EVENTS in the module
-			module_LOGR_.toggled= {
-				MORE_EVENTS : true
-			};
+			// toggled is 8n and module_l_.EVENTS is still 8n, so this should log
 			log_as_member();
 			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			consoleSpy.calls.reset();
+
+			// ----
+			// the proper way would be to ...
+
+			// reassign labels in submodule
+			Object.assign(module_l_, l_array(['EVENTS','HANDLERS']));
+			expect(module_l_).toEqual({ 
+				EVENTS : 0b1 << 0,
+				HANDLERS : 0b1 << 1,
+			});
+
+			// update the local labels to include the reassignment
+			l_= l_concat(module_l_, ['DEL', 'MORE_EVENTS']);
+			expect(l_).toEqual({ 
+				EVENTS : 0b1 << 0,
+				HANDLERS : 0b1 << 1,
+				DEL : 0b1 << 2,		// removed
+				MORE_EVENTS : 0b1 << 3,	// connections
+			});
+			// updating the labels ZEROS OUT TOGGLED!
+			local_LOGR_.labels= l_;
+			expect(module_LOGR_.toggled).toEqual(BigInt(0));
+
+			// set the desired toggled ...
+			module_LOGR_.toggled= {
+				// EVENTS : 0b1 << 0,
+				MORE_EVENTS : 0b1 << 3,	// connections
+			}
+
+			// this should NOT fire, because now EVENTS has been reassigned
+			log_as_member();
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			consoleSpy.calls.reset();
+
+			module_LOGR_.toggled= {
+				EVENTS : 0b1 << 0,
+				// MORE_EVENTS : 0b1 << 3,	// connections
+			}
+
+			log_as_member();
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			consoleSpy.calls.reset();
+
+			// reset
+			Object.assign(module_l_, { 
+				EVENTS : 0b1 << 3,
+				HANDLERS : 0b1 << 4,
+			});
 		});
 
 	});
@@ -675,7 +764,7 @@ describe("LOGR and helper Functions;", () => {
 				// Empty function (NOP)
 			}
 	
-			const LOGR_= LOGR.instance();
+			const LOGR_= LOGR.get_instance();
 			const l_= {
 				DEL : 0b1 << 0,		// removed
 				CXNS : 0b1 << 2,	// connections
@@ -737,7 +826,7 @@ describe("LOGR and helper Functions;", () => {
 
 		beforeEach(() => {
 			// Reset the singleton instance before each test
-			LOGR_ = LOGR.instance();
+			LOGR_ = LOGR.get_instance();
 			l_= l_array(['A', 'B', 'C']); // { A: 1, B: 2, C: 4 }
 			LOGR_.labels = l_;
 			handlerSpy = jasmine.createSpy('handler');
