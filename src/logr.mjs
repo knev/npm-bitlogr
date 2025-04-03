@@ -246,7 +246,7 @@ const LOGR = (function () {
 
 	// Public interface
 	return {
-		instance() {
+		get_instance() {
 			if (!_instance) {
 				_instance = _create_instance(); // Lazy initialization
 			}
