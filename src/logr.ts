@@ -16,7 +16,7 @@ function l_length_(obj_labels) {
     if (labels.length === 0) 
 		return 1; // Empty object case, start at 1
 
-    const value_max = Math.max(...labels);
+    const value_max = Math.max(...labels as number[]);
 		if (value_max <= 0) return 1
 
     const bit_highest = Math.floor(Math.log2(value_max));
@@ -73,7 +73,7 @@ function l_concat_(obj_labels, arg) {
 
 	for (const [key, value] of arg_entries) {
 		if (!(key in result)) {
-			result[key] = value === 0 ? 0 : value << shift;
+			result[key] = value === 0 ? 0 : (value as number) << shift;
 		}
 	}
 
@@ -100,7 +100,7 @@ function l_merge_(obj_labels1, obj_labels2) {
     const set_values = new Set(Object.values(obj_labels1)); // Track all used bit values
     
     // Find the highest bit position to start shifting from if needed
-    const value_highest = Math.max(0, ...set_values);
+    const value_highest = Math.max(0, ...Array.from(set_values) as number[]);
     let next_shift = value_highest ? Math.floor(Math.log2(value_highest)) + 1 : 0;
 
     // Process second set
@@ -231,13 +231,21 @@ const LOGR = (function () {
 			},
 
 			log(nr_logged, argsFn) {
-				// Ensure LOGR_ENABLED is defined (for testing purposes)
-				if (typeof LOGR_ENABLED === 'undefined') {
-					console.warn('LOGR_ENABLED not defined, defaulting to true');
-					global.LOGR_ENABLED = true;
-				}
-				if (! LOGR_ENABLED) 
+				const LOGR_ENABLED: boolean = typeof globalThis !== 'undefined'
+					? (globalThis as any).LOGR_ENABLED ?? true
+					: true;
+
+				if (!LOGR_ENABLED)
 					return undefined;
+				/*
+				// Ensure LOGR_ENABLED is defined (for testing purposes)
+				if (typeof globalThis.LOGR_ENABLED === 'undefined') {
+					console.warn('LOGR_ENABLED not defined, defaulting to true');
+					globalThis.LOGR_ENABLED = true;
+				}
+				if (! globalThis.LOGR_ENABLED) 
+					return undefined;
+				*/
 				
                 return _log_fxn.call(this, nr_logged, argsFn); // Pass the thunk
             }

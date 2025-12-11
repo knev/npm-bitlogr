@@ -1,5 +1,5 @@
 
-import { LOGR } from '../src/logr.mjs';
+import { LOGR } from '../dist/logr.es.mjs';
 
 let LOGR_ = LOGR.get_instance();
 const l_= {
