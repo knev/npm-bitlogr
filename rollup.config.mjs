@@ -19,8 +19,14 @@ export default [
 		},
 		plugins: [
 			typescript({ tsconfig: './tsconfig.json' }),
-			replace({ 'LOGR_ENABLED': JSON.stringify(!isProduction), preventAssignment: true }),
-			isProduction && terser()
+            isProduction && terser({
+                compress: {
+                    dead_code: true,
+                    global_defs: {
+                        'LOGR_ENABLED': false   // ← Terser understands this
+                    }
+                }
+            })
 		]		
 	},
 	{
@@ -32,8 +38,14 @@ export default [
 		},
 		plugins: [
 			typescript({ tsconfig: './tsconfig.json' }),
-			replace({ 'LOGR_ENABLED': JSON.stringify(!isProduction), preventAssignment: true }),
-			isProduction && terser()
+            isProduction && terser({
+                compress: {
+                    dead_code: true,
+                    global_defs: {
+                        'LOGR_ENABLED': false   // ← Terser understands this
+                    }
+                }
+            })
 		]		
 	}
 ];

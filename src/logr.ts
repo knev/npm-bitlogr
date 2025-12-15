@@ -186,70 +186,72 @@ function l_toBigInt_(obj_labels, obj, ignore= false) {
 
 // console.log(l_toBigInt_({},{}))
 
+type LogrOptions = {
+  labels?: Record<string, number>;
+  log_handler?: ((...args: any[]) => void);
+};
+
 const LOGR = (function () {
 	let _instance; // Private variable to hold the single instance
 
 	function _create_instance() {
 		// Private state (replacing constructor properties)
-		let _handler_log = handler_default_;
-		let _obj_labels = undefined;
 		let _Bint_toggled = BigInt(0);
+		let _handler_log = handler_default_;
 
 		function _log_fxn(nr_logged, argsFn /* args */) {
 			if ((BigInt(nr_logged) & _Bint_toggled) === BigInt(0))
-				return false;
+				return;
 
 			const args = argsFn();
 			_handler_log.apply(this, args);
-			// _handler_log.apply(this, args);
-			return true;
 		}
 
 		return {
+			get handler() { return _handler_log; },
 			set handler(fx) {
 				_handler_log = fx;
 			},
-			get handler() {
-				return _handler_log;
-			},
-
-			get labels() { return _obj_labels; },
-			set labels(obj) {
-				_obj_labels = obj;
-				_Bint_toggled = BigInt(0);
-			},
-
-			// put= function(label, abbrv) {
-			// 	let name= __name(label);
-			// 	_labels[name]= label[name];
-			// 	console.log(_labels);
-			// }
 
 			get toggled() { return _Bint_toggled; },
-			set toggled(obj_toggled) {
-				_Bint_toggled= l_toBigInt_(_obj_labels, obj_toggled);
+			toggle(obj_labels, obj_toggled) {
+				_Bint_toggled= l_toBigInt_(obj_labels, obj_toggled);
 			},
 
-			log(nr_logged, argsFn) {
-				const LOGR_ENABLED: boolean = typeof globalThis !== 'undefined'
-					? (globalThis as any).LOGR_ENABLED ?? true
-					: true;
+			 // Core internal log function (exposed only to created loggers)
+			_log_fxn,
 
-				if (!LOGR_ENABLED)
-					return undefined;
-				/*
-				// Ensure LOGR_ENABLED is defined (for testing purposes)
-				if (typeof globalThis.LOGR_ENABLED === 'undefined') {
-					console.warn('LOGR_ENABLED not defined, defaulting to true');
-					globalThis.LOGR_ENABLED = true;
+			create(options: LogrOptions = {}) {
+				// This constant will be replaced at build time
+				if (!((globalThis as any).LOGR_ENABLED ?? true)) {
+					return {
+						_obj_labels: undefined,  // optional: keep shape compatible if needed
+						log: () => {},     // does nothing
+						raw: () => {},     // does nothing
+					};
 				}
-				if (! globalThis.LOGR_ENABLED) 
-					return undefined;
-				*/
-				
-                return _log_fxn.call(this, nr_logged, argsFn); // Pass the thunk
-            }
-		};
+
+				const _logger = {
+					_obj_labels: options.labels ?? undefined,
+
+					log(nr_logged, argsFn) {
+						// This constant will be replaced at build time
+            			if (!((globalThis as any).LOGR_ENABLED ?? true))
+							return;
+
+						_log_fxn.call(this, nr_logged, argsFn);
+					},
+
+					// Optional shorthand for common cases
+                    raw(...args) {
+                        _handler_log.apply(this, args);
+                    }
+				}
+
+				return _logger;
+			},
+
+		}
 	}
 
 	// Public interface

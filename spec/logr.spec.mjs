@@ -1,6 +1,6 @@
 
 import { LOGR, l_length, l_array, l_concat, l_merge, l_LL, l_RR } from '../dist/logr.es.mjs';
-import { LOGR as module_LOGR_, l as module_l_, log_as_member } from './module.mjs';
+import { l as module_l_, log_as_member } from './module.mjs';
 
 describe("LOGR and helper Functions;", () => {
 
@@ -458,7 +458,9 @@ describe("LOGR and helper Functions;", () => {
 
 		beforeEach(() => {
 			LOGR_= LOGR.get_instance();
-			LOGR_.labels= module_l_; // reset the labels back to that of submodule
+			const logr_ = LOGR_.create({ labels: module_l_ });
+
+			LOGR_.toggle(module_l_, {}); // reset the labels back to that of submodule
 
 			// Spy on console.log before each test
 			spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
@@ -470,15 +472,12 @@ describe("LOGR and helper Functions;", () => {
 		});
 	
 		it("should initialize with default values", () => {
-			expect(LOGR_.labels).toBe(module_l_); // because it is a singleton class
 			expect(LOGR_.toggled).toBe(0n);
-		
-			LOGR_.labels = undefined;
 			expect(() => {
-				LOGR_.toggled = {
+				LOGR_.toggle(null, {
 					DEL: true,
 					// CXNS: true
-				};
+				});
 			}).toThrowError(Error, "obj_labels must be an object");
 		});
 
@@ -497,46 +496,47 @@ describe("LOGR and helper Functions;", () => {
 			// Spy on the handler to observe calls
 			const handlerSpy = jasmine.createSpy('handlerSpy');
 			LOGR_.handler = handlerSpy;
-			LOGR_.labels = l_;
+			const logr_ = LOGR_.create({ labels: l_ });
 	
 			// Initial state: toggled is unset, _log_fxn should be NOP
-			LOGR_.log(l_.DEL, 'Initial message');
+			logr_.log(l_.DEL, 'Initial message');
 			expect(handlerSpy).not.toHaveBeenCalled(); // NOP behavior
 	
-			LOGR_.toggled= { 
+			LOGR_.toggle(l_, { 
 				DEL : true,
 				// CXNS : true
-			};
+			});
 
-			LOGR_.log(l_.DEL, () => ['DEL message']);
+			logr_.log(l_.DEL, () => ['DEL message']);
 			expect(handlerSpy).toHaveBeenCalledWith('DEL message');
 	
 			handlerSpy.calls.reset();
-			LOGR_.log(l_.CXNS, () => ['CXNS message']);
+			logr_.log(l_.CXNS, () => ['CXNS message']);
 			expect(handlerSpy).not.toHaveBeenCalled(); // No match
 	
-			LOGR_.toggled= { 
+			LOGR_.toggle(l_, { 
 				// DEL : true,
 				CXNS : true
-			};
+			});
 	
-			LOGR_.log(l_.DEL, () => ['DEL message again']);
+			logr_.log(l_.DEL, () => ['DEL message again']);
 			expect(handlerSpy).not.toHaveBeenCalled(); // No match
 	
 			handlerSpy.calls.reset();
-			LOGR_.log(l_.CXNS, () => ['CXNS message again']);
+			logr_.log(l_.CXNS, () => ['CXNS message again']);
 			expect(handlerSpy).toHaveBeenCalledWith('CXNS message again');
 
 			// should log to console with default handler when toggled matches with OR
 			handlerSpy.calls.reset();
-			LOGR_.log(l_.DEL | l_.CXNS, () => ['CXNS message again']);
+			logr_.log(l_.DEL | l_.CXNS, () => ['CXNS message again']);
 			expect(handlerSpy).toHaveBeenCalledWith('CXNS message again');
 
 			// should reset _log_fxn to NOP when toggled is cleared
-			LOGR_.toggled = {};
+			LOGR_.toggle(l_, { 
+			});
 	
 			handlerSpy.calls.reset();
-			LOGR_.log(l_.DEL, () => ['NOP message']);
+			logr_.log(l_.DEL, () => ['NOP message']);
 			expect(handlerSpy).not.toHaveBeenCalled(); // Back to NOP
 		});
 	
@@ -545,11 +545,13 @@ describe("LOGR and helper Functions;", () => {
 	describe("two LOGRs;", () => {
 		let consoleSpy;
 
-		let local_LOGR_;
+		let local_logr_;
 		const local_l_= {
 			DEL : 0b1 << 0,		// removed
 			CXNS : 0b1 << 2,	// connections
 		}
+
+		const LOGR_= LOGR.get_instance();
 		
 		// Define the default handler explicitly if not exported
 		const defaultHandler = function(...args) {
@@ -560,9 +562,8 @@ describe("LOGR and helper Functions;", () => {
 		});
 	
 		beforeEach(() => {
-			local_LOGR_= LOGR.get_instance();
-			local_LOGR_.labels = module_l_; // Baseline
-			local_LOGR_.handler = defaultHandler; // Ensure handler per test
+			local_logr_ = LOGR_.create({ labels: module_l_ });
+			LOGR_.handler = defaultHandler; // Ensure handler per test
 			consoleSpy = spyOn(console, "log"); //.and.callThrough();
 		});
 
@@ -571,32 +572,57 @@ describe("LOGR and helper Functions;", () => {
 			consoleSpy.calls.reset();
 		});
 
-		it("local_LOGR_ should fire", () => {
-			local_LOGR_.labels= local_l_;
-			local_LOGR_.toggled= {
-				DEL : true
-			};
+		it('module.mjs', () => {
+			LOGR_.toggle(module_l_, {
+				EVENTS : true
+			});
 
-			local_LOGR_.log(local_l_.DEL, () => ["local_LOGR_: This should log"]);
-			expect(consoleSpy).toHaveBeenCalledWith("local_LOGR_: This should log");
+			log_as_member(); // should fire, because module toggles EVENTS
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an CXNS");
 		});
 
-		it("module LOGR_ should fire, without importing it", () => {
-			local_LOGR_.labels= module_l_;
-			local_LOGR_.toggled= {
+		it("local_LOGR_ should fire, module LOGR_ should NOT", () => {
+			expect(local_l_).toEqual({ 
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			});
+			expect(module_l_).toEqual({ 
+				CXNS : 0b1 << 2,	// connections
+				EVENTS : 0b1 << 3,
+				HANDLERS : 0b1 << 4,
+			});
+			expect(local_l_.CXNS === module_l_.CXNS);
+
+			LOGR_.toggle(local_l_, {
+				DEL : true,
+				CXNS : true
+			});
+
+			local_logr_.log(local_l_.DEL, () => ["local_LOGR_: This should log"]);
+			expect(consoleSpy).toHaveBeenCalledWith("local_LOGR_: This should log");
+
+			log_as_member(); 
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an CXNS");
+		});
+
+		it("module LOGR_ should fire again", () => {
+			LOGR_.toggle(module_l_, {
 				EVENTS : true
-			};
+			});
 
 			log_as_member();
 			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an CXNS");
 		});
 
-		it("Borrow module_LOGR_, forget to update labels", () => {
-			module_LOGR_.toggled= {
+		it("forget to update labels", () => {
+			LOGR_.toggle(module_l_, {
 				DEL : true
-			};
+			});
 
-			module_LOGR_.log(local_l_.DEL, () => ["local module_LOGR_: This should NOT log"]);
+			local_logr_.log(local_l_.DEL, () => ["local module_LOGR_: This should NOT log"]);
 			expect(consoleSpy).not.toHaveBeenCalledWith("local module_LOGR_: This should NOT log");
 		});
 
@@ -608,26 +634,33 @@ describe("LOGR and helper Functions;", () => {
 				DEL : 0b1 << 0,		// removed
 				CXNS : 0b1 << 2,	// connections
 			});
-			module_LOGR_.labels= l_;
-			module_LOGR_.toggled= {
-				DEL : true
-			};
+			LOGR_.toggle(l_, {
+				DEL : true,
+				EVENTS :  true
+			});
 
-			module_LOGR_.log(local_l_.DEL, () => ["local module_LOGR_: This should log"]);
+			local_logr_.log(local_l_.DEL, () => ["local module_LOGR_: This should log"]);
 			expect(consoleSpy).toHaveBeenCalledWith("local module_LOGR_: This should log");
+
+			log_as_member();
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
 		});
 
 		it("reassigning a new name to sub-module keys", () => {
-			expect(module_LOGR_.labels).toEqual({ 
+			expect(local_l_).toEqual({ 
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			});
+			expect(module_l_).toEqual({ 
+				CXNS : 0b1 << 2,	// connections
 				EVENTS : 0b1 << 3,
 				HANDLERS : 0b1 << 4,
 			});
-			expect(module_LOGR_.toggled).toEqual(BigInt(0));
 
-			local_LOGR_.toggled= {
+			LOGR_.toggle(module_l_, {
 				EVENTS : true
-			};
-			expect(module_LOGR_.toggled).toEqual(BigInt(8));
+			});
+			expect(LOGR_.toggled).toEqual(BigInt(8));
 
 			log_as_member();
 			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
@@ -635,98 +668,81 @@ describe("LOGR and helper Functions;", () => {
 
 			// ----
 
-			module_l_.EVENTS = 0b1 << 0;
-			expect(module_l_).toEqual({ 
-				EVENTS : 0b1 << 0,
-				HANDLERS : 0b1 << 4,
+			const conflicting_l_= l_merge({
+				MEMORY : 0b1 << 3,
+				RUNTIME : 0b1 << 4,
+			}, module_l_);
+			// console.warn('conflicting_l_', conflicting_l_);
+			expect(conflicting_l_).toEqual({ 
+				CXNS : 0b1 << 2,	// connections
+				MEMORY : 0b1 << 3,
+				RUNTIME : 0b1 << 4,
+				EVENTS : 0b1 << 5,
+				HANDLERS : 0b1 << 6,
 			});
-			// module_LOGR_.labels has changed, because it is equal to structure l_ in the module
-			expect(module_LOGR_.labels).toEqual(module_l_);
 
-			// toggled is still 8n, so this won't fire.
+			// this should NOT cause EVENT to log in module, because the value of EVENTS changed
+			LOGR_.toggle(conflicting_l_, {
+				EVENTS : true
+			});
+			expect(LOGR_.toggled).toEqual(BigInt(32));
+
 			log_as_member();
 			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
 			consoleSpy.calls.reset();
 
 			// ----
-
-			let l_= l_array(['EVENTS','HANDLERS', 'DEL', 'MORE_EVENTS']);
-			expect(l_).toEqual({ 
-				EVENTS : 0b1 << 0,
-				HANDLERS : 0b1 << 1,
-				DEL : 0b1 << 2,		// removed
-				MORE_EVENTS : 0b1 << 3,	// connections
-			});
-			// updating the labels ZEROS OUT TOGGLED!
-			local_LOGR_.labels= l_;
-
-			// changing module_l_ now won't change local_LOGR_.labels, since it points to a new object
-			expect(module_l_).toEqual({ 
-				EVENTS : 0b1 << 0,
-				HANDLERS : 0b1 << 4,
-			});
-			module_l_.EVENTS = 0b1 << 3,
-			expect(module_l_).toEqual({ 
-				EVENTS : 0b1 << 3,
-				HANDLERS : 0b1 << 4,
-			});
-			expect(l_).toEqual({ 
-				EVENTS : 0b1 << 0,
-				HANDLERS : 0b1 << 1,
-				DEL : 0b1 << 2,		// removed
-				MORE_EVENTS : 0b1 << 3,	// connections
-			});
-			expect(module_LOGR_.toggled).toEqual(BigInt(0));
-			module_LOGR_.toggled= {
-				MORE_EVENTS : 0b1 << 3,	// connections
-			}
-			expect(module_LOGR_.toggled).toEqual(BigInt(8));
-
-			// toggled is 8n and module_l_.EVENTS is still 8n, so this should log
-			log_as_member();
-			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
-			consoleSpy.calls.reset();
-
-			// ----
-			// the proper way would be to ...
+			// reuse the module_l_ object ...
 
 			// reassign labels in submodule
-			Object.assign(module_l_, l_array(['EVENTS','HANDLERS']));
+			Object.assign(module_l_, conflicting_l_);
 			expect(module_l_).toEqual({ 
-				EVENTS : 0b1 << 0,
-				HANDLERS : 0b1 << 1,
+				CXNS : 0b1 << 2,	// connections
+				MEMORY : 0b1 << 3,
+				RUNTIME : 0b1 << 4,
+				EVENTS : 0b1 << 5,
+				HANDLERS : 0b1 << 6,
 			});
-
-			// update the local labels to include the reassignment
-			l_= l_concat(module_l_, ['DEL', 'MORE_EVENTS']);
-			expect(l_).toEqual({ 
-				EVENTS : 0b1 << 0,
-				HANDLERS : 0b1 << 1,
-				DEL : 0b1 << 2,		// removed
-				MORE_EVENTS : 0b1 << 3,	// connections
-			});
-			// updating the labels ZEROS OUT TOGGLED!
-			local_LOGR_.labels= l_;
-			expect(module_LOGR_.toggled).toEqual(BigInt(0));
-
-			// set the desired toggled ...
-			module_LOGR_.toggled= {
-				// EVENTS : 0b1 << 0,
-				MORE_EVENTS : 0b1 << 3,	// connections
-			}
-
-			// this should NOT fire, because now EVENTS has been reassigned
-			log_as_member();
-			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
-			consoleSpy.calls.reset();
-
-			module_LOGR_.toggled= {
-				EVENTS : 0b1 << 0,
-				// MORE_EVENTS : 0b1 << 3,	// connections
-			}
 
 			log_as_member();
 			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an CXNS");
+			consoleSpy.calls.reset();
+
+			// ----
+
+			const additional_l_ = l_array(['MORE', 'EXTRA'], 0b1 << 7);
+			expect(additional_l_).toEqual({
+				MORE: 0b1 << 7, 
+				EXTRA: 0b1 << 8 
+			});			
+
+			Object.assign(module_l_, additional_l_);
+			expect(module_l_).toEqual({ 
+				CXNS : 0b1 << 2,	// connections
+				MEMORY : 0b1 << 3,
+				RUNTIME : 0b1 << 4,
+				EVENTS : 0b1 << 5,
+				HANDLERS : 0b1 << 6,
+				MORE: 0b1 << 7, 
+				EXTRA: 0b1 << 8 
+			});
+
+			local_logr_ = LOGR_.create({ labels: module_l_ });
+			LOGR_.toggle(module_l_, {
+				CXNS : true,
+				MORE : true
+			});
+
+			local_logr_.log(module_l_.CXNS, () => ["local module_LOGR_: This should log"]);
+			expect(consoleSpy).toHaveBeenCalledWith("local module_LOGR_: This should log");
+
+			local_logr_.log(module_l_.MORE, () => ["local module_LOGR_: This should log MORE"]);
+			expect(consoleSpy).toHaveBeenCalledWith("local module_LOGR_: This should log MORE");
+
+			log_as_member();
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an CXNS");
 			consoleSpy.calls.reset();
 
 			// reset
@@ -738,13 +754,126 @@ describe("LOGR and helper Functions;", () => {
 
 	});
 
+	describe('Object.defineProperty(global, \'LOGR_ENABLED\', {});', () => {
+		let LOGR_;
+		let logr_;
+		let l_;
+		let handlerSpy;
+
+		beforeEach(() => {
+			// Reset the singleton instance before each test
+			l_= l_array(['A', 'B', 'C']); // { A: 1, B: 2, C: 4 }
+
+			LOGR_ = LOGR.get_instance();
+			logr_ = LOGR_.create({ labels: l_ });
+			handlerSpy = jasmine.createSpy('handler');
+			LOGR_.handler = handlerSpy;
+		});
+
+		describe('Development Mode (LOGR_ENABLED = true)', () => {
+			// beforeEach(() => {
+			// 	// Simulate dev mode by ensuring LOGR_ENABLED is true
+			// 	// In a real build, this would be set by Webpack DefinePlugin/ rollup
+			// 	if (typeof LOGR_ENABLED === 'undefined') {
+			// 		global.LOGR_ENABLED = true; // Fallback for testing
+			// 	}
+			// });
+			beforeEach(() => {
+				// Forcefully set LOGR_ENABLED to false for these tests
+				Object.defineProperty(globalThis, 'LOGR_ENABLED', {
+					value: true,
+					writable: true,
+					configurable: true
+				});
+			});
+
+			afterEach(() => {
+				// Clean up to avoid affecting other tests
+				delete globalThis.LOGR_ENABLED;
+			});
+		
+			it('should call the handler when toggled bits match', () => {
+				LOGR_.toggle(l_, { A: true, B: true }); // toggled = 0b011 (3)
+				
+				logr_.log(l_.B, () => ['test message', 'extra arg']); // nr_logged = 2 (0b010)
+				expect(handlerSpy).toHaveBeenCalledWith('test message', 'extra arg');
+			});
+
+			it('should not call the handler when toggled bits do not match', () => {
+				LOGR_.toggle(l_, { A: true }); // toggled = 0b001 (1)
+				
+				logr_.log(l_.B, () => ['test message']); // nr_logged = 2 (0b010)
+				expect(handlerSpy).not.toHaveBeenCalled();
+			});
+
+			it('should evaluate argsFn only when logging occurs', () => {
+				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['computed message']);
+				LOGR_.toggle(l_, { A: true, B: true }); // toggled = 0b011 (3)
+
+				logr_.log(l_.A, argsSpy); // nr_logged = 1 (0b001)
+				expect(argsSpy).toHaveBeenCalled(); // argsFn was evaluated
+				expect(handlerSpy).toHaveBeenCalledWith('computed message');
+			});
+
+			it('should not evaluate argsFn when logging is skipped', () => {
+				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['computed message']);
+				LOGR_.toggle(l_, { A: true }); // toggled = 0b001 (1)
+				
+				logr_.log(l_.B, argsSpy); // nr_logged = 2 (0b010)
+				expect(argsSpy).not.toHaveBeenCalled(); // argsFn was not evaluated
+				expect(handlerSpy).not.toHaveBeenCalled();
+			});
+		});
+
+		describe('Production Mode (LOGR_ENABLED = false)', () => {
+			beforeEach(() => {
+				// Forcefully set LOGR_ENABLED to false for these tests
+				Object.defineProperty(globalThis, 'LOGR_ENABLED', {
+					value: false,
+					writable: true,
+					configurable: true
+				});
+			});
+		
+			afterEach(() => {
+				// Clean up to avoid affecting other tests
+				delete globalThis.LOGR_ENABLED;
+			});
+		
+			it('should not call the handler even when toggled bits match', () => {
+				LOGR_.toggle(l_, { A: true, B: true }); // toggled = 0b011 (3)
+				
+				logr_.log(l_.B, () => ['test message', 'extra arg']); // nr_logged = 2 (0b010)
+				expect(handlerSpy).not.toHaveBeenCalled();
+			});
+
+			it('should not evaluate argsFn at all', () => {
+				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['expensive computation']);
+				LOGR_.toggle(l_, { A: true, B: true }); // toggled = 0b011 (3)
+				
+				logr_.log(l_.B, argsSpy); // nr_logged = 2 (0b010)
+				expect(argsSpy).not.toHaveBeenCalled(); // No evaluation in prod
+				expect(handlerSpy).not.toHaveBeenCalled();
+			});
+
+			it('should return undefined from log method', () => {
+				LOGR_.toggle(l_, { A: true, B: true }); // toggled = 0b011 (3)
+				
+				const result = logr_.log(l_.B, () => ['test message']);
+				expect(result).toBe(undefined);
+			});
+		});
+	});
+
 	describe("performance;", () => {
+		let logSpy;		
+
 		beforeEach(() => {
 			// Spy on console.log before each test
-			spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
+			logSpy= spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
 
 			// Forcefully set LOGR_ENABLED to false for these tests
-			Object.defineProperty(global, 'LOGR_ENABLED', {
+			Object.defineProperty(globalThis, 'LOGR_ENABLED', {
 				value: false,
 				writable: true,
 				configurable: true
@@ -753,7 +882,7 @@ describe("LOGR and helper Functions;", () => {
 	
 		afterEach(() => {
 			// Reset the spy after each test to avoid interference
-			console.log.calls.reset();
+			logSpy.calls.reset();
 
 			// Clean up to avoid affecting other tests
 			delete global.LOGR_ENABLED;
@@ -764,25 +893,50 @@ describe("LOGR and helper Functions;", () => {
 				// Empty function (NOP)
 			}
 	
-			const LOGR_= LOGR.get_instance();
 			const l_= {
 				DEL : 0b1 << 0,		// removed
 				CXNS : 0b1 << 2,	// connections
 			}
-			LOGR_.labels= l_;
-			LOGR_.toggled= {
-				// DEL : true
-			}
 
-			const log_= LOGR_.log;	
+			const LOGR_= LOGR.get_instance();
+			const logr_ = LOGR_.create({ labels: l_ });
+
+			// ----
+
+			LOGR_.toggle(l_, {
+				DEL : true
+			});
+
 			const fxn_log = function () {
-				return log_(l_.DEL | l_.CXNS, () => ["this message should not log", JSON.stringify(LOGR_.labels)]);
+				logr_.log(l_.DEL | l_.CXNS, () => ["this log message", JSON.stringify(l_)]);
 			};
 
-			const result = fxn_log();
-			expect(result).toBe(undefined);
-			expect(console.log).not.toHaveBeenCalledWith("this message should not log", jasmine.any(String)); // Verify no logging	
-	
+			fxn_log();
+			expect(console.log).not.toHaveBeenCalledWith("this log message", jasmine.any(String)); // Verify no logging	
+			logSpy.calls.reset();
+
+			// ----
+
+			LOGR_.toggle(l_, {
+			});
+
+			fxn_log();
+			expect(console.log).not.toHaveBeenCalledWith("this log message", jasmine.any(String)); // Verify no logging	
+			logSpy.calls.reset();
+
+			// ----
+
+			LOGR_.toggle(l_, {
+				DEL : true
+			});
+			LOGR_.handler= undefined; // this shouldn't cause a throw, since the handler should never be called
+
+			fxn_log();
+			expect(console.log).not.toHaveBeenCalledWith("this log message", jasmine.any(String)); // Verify no logging	
+			logSpy.calls.reset();
+
+			// ----
+
 			// Warm-up runs to avoid JIT compilation skewing results
 			for (let i = 0; i < 1000; i++) {
 				fxn_empty();
@@ -813,119 +967,11 @@ describe("LOGR and helper Functions;", () => {
 			console.log(`Logging function time: ${t_log.toFixed(2)}ms`);
 			console.log(`Difference: ${difference.toFixed(2)}ms`);
 			console.log(`Logging function is ${percentSlower}% slower`);
-	
+
 			// Basic assertion to ensure test passes
 			expect(true).toBe(true);
 		});
 	});
 
-	describe('Object.defineProperty(global, \'LOGR_ENABLED\', {});', () => {
-		let LOGR_;
-		let l_;
-		let handlerSpy;
-
-		beforeEach(() => {
-			// Reset the singleton instance before each test
-			LOGR_ = LOGR.get_instance();
-			l_= l_array(['A', 'B', 'C']); // { A: 1, B: 2, C: 4 }
-			LOGR_.labels = l_;
-			handlerSpy = jasmine.createSpy('handler');
-			LOGR_.handler = handlerSpy;
-		});
-
-		describe('Development Mode (LOGR_ENABLED = true)', () => {
-			// beforeEach(() => {
-			// 	// Simulate dev mode by ensuring LOGR_ENABLED is true
-			// 	// In a real build, this would be set by Webpack DefinePlugin/ rollup
-			// 	if (typeof LOGR_ENABLED === 'undefined') {
-			// 		global.LOGR_ENABLED = true; // Fallback for testing
-			// 	}
-			// });
-			beforeEach(() => {
-				// Forcefully set LOGR_ENABLED to false for these tests
-				Object.defineProperty(global, 'LOGR_ENABLED', {
-					value: true,
-					writable: true,
-					configurable: true
-				});
-			});
-
-			afterEach(() => {
-				// Clean up to avoid affecting other tests
-				delete global.LOGR_ENABLED;
-			});
-		
-			it('should call the handler when toggled bits match', () => {
-				LOGR_.toggled = { A: true, B: true }; // toggled = 0b011 (3)
-				LOGR_.log(l_.B, () => ['test message', 'extra arg']); // nr_logged = 2 (0b010)
-
-				expect(handlerSpy).toHaveBeenCalledWith('test message', 'extra arg');
-			});
-
-			it('should not call the handler when toggled bits do not match', () => {
-				LOGR_.toggled = { A: true }; // toggled = 0b001 (1)
-				LOGR_.log(l_.B, () => ['test message']); // nr_logged = 2 (0b010)
-
-				expect(handlerSpy).not.toHaveBeenCalled();
-			});
-
-			it('should evaluate argsFn only when logging occurs', () => {
-				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['computed message']);
-				LOGR_.toggled = { A: true, B: true }; // toggled = 0b011 (3)
-				LOGR_.log(l_.A, argsSpy); // nr_logged = 1 (0b001)
-
-				expect(argsSpy).toHaveBeenCalled(); // argsFn was evaluated
-				expect(handlerSpy).toHaveBeenCalledWith('computed message');
-			});
-
-			it('should not evaluate argsFn when logging is skipped', () => {
-				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['computed message']);
-				LOGR_.toggled = { A: true }; // toggled = 0b001 (1)
-				LOGR_.log(l_.B, argsSpy); // nr_logged = 2 (0b010)
-
-				expect(argsSpy).not.toHaveBeenCalled(); // argsFn was not evaluated
-				expect(handlerSpy).not.toHaveBeenCalled();
-			});
-		});
-
-		describe('Production Mode (LOGR_ENABLED = false)', () => {
-			beforeEach(() => {
-				// Forcefully set LOGR_ENABLED to false for these tests
-				Object.defineProperty(global, 'LOGR_ENABLED', {
-					value: false,
-					writable: true,
-					configurable: true
-				});
-			});
-		
-			afterEach(() => {
-				// Clean up to avoid affecting other tests
-				delete global.LOGR_ENABLED;
-			});
-		
-			it('should not call the handler even when toggled bits match', () => {
-				LOGR_.toggled = { A: true, B: true }; // toggled = 0b011 (3)
-				LOGR_.log(l_.B, () => ['test message', 'extra arg']); // nr_logged = 2 (0b010)
-
-				expect(handlerSpy).not.toHaveBeenCalled();
-			});
-
-			it('should not evaluate argsFn at all', () => {
-				const argsSpy = jasmine.createSpy('argsFn').and.returnValue(['expensive computation']);
-				LOGR_.toggled = { A: true, B: true }; // toggled = 0b011 (3)
-				LOGR_.log(l_.B, argsSpy); // nr_logged = 2 (0b010)
-
-				expect(argsSpy).not.toHaveBeenCalled(); // No evaluation in prod
-				expect(handlerSpy).not.toHaveBeenCalled();
-			});
-
-			it('should return undefined from log method', () => {
-				LOGR_.toggled = { A: true, B: true }; // toggled = 0b011 (3)
-				const result = LOGR_.log(l_.B, () => ['test message']);
-
-				expect(result).toBe(undefined);
-			});
-		});
-	});
 
 });
