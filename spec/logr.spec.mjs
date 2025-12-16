@@ -2,7 +2,7 @@
 import { LOGR, l_length, l_array, l_concat, l_merge, l_LL, l_RR } from '../dist/logr.es.mjs';
 import { l as module_l_, log_as_member } from './module.mjs';
 
-describe("LOGR and helper Functions;", () => {
+describe("LOGR(root);", () => {
 
 	describe("helper Functions;", () => {
 
@@ -972,6 +972,5 @@ describe("LOGR and helper Functions;", () => {
 			expect(true).toBe(true);
 		});
 	});
-
 
 });
