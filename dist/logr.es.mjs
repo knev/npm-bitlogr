@@ -155,8 +155,18 @@ function l_toBigInt_(obj_labels, obj, ignore = false) {
     return bigInt;
 }
 const LOGR = (function () {
-    let _instance; // Private variable to hold the single instance
+    // let _instance; // Private variable to hold the single instance
+    // Module-level state would work - but only when the module is loaded once. 
+    // Your bundler is currently bundling @knev/bitlogr into your distribution file, 
+    // creating a second copy. The Global Symbol approach would work around this, 
+    // but it's treating the symptom, not the cause. 
+    const GLOBAL_KEY = Symbol.for('@knev/bitlogr/LOGR');
+    // The real issue is your build configuration bundling dependencies that should remain external.
+    // rollup.config.mjs: external: ['@knev/bitlogr', 'uuid'], // Don't bundle these
     function _create_instance() {
+        const _id = Math.random();
+        if (globalThis.LOGR_ENABLED ?? true)
+            console.log('creating LOGR instance:', _id);
         // Private state (replacing constructor properties)
         let _Bint_toggled = BigInt(0);
         let _handler_log = handler_default_;
@@ -167,6 +177,7 @@ const LOGR = (function () {
             _handler_log.apply(this, args);
         }
         return {
+            _id, // for testing
             get handler() { return _handler_log; },
             set handler(fx) {
                 _handler_log = fx;
@@ -206,10 +217,16 @@ const LOGR = (function () {
     // Public interface
     return {
         get_instance() {
-            if (!_instance) {
-                _instance = _create_instance(); // Lazy initialization
-            }
-            return _instance;
+            // if (!_instance)
+            // 	_instance = _create_instance(); // Lazy initialization
+            // return _instance;
+            if (!globalThis[GLOBAL_KEY])
+                globalThis[GLOBAL_KEY] = _create_instance();
+            return globalThis[GLOBAL_KEY];
+        },
+        // For testing only - reset the singleton
+        _reset_for_testing() {
+            delete globalThis[GLOBAL_KEY];
         }
     };
 })();

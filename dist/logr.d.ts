@@ -6,5 +6,6 @@ declare function l_LL_(obj: any, x: any): Readonly<{}>;
 declare function l_RR_(obj: any, x: any): Readonly<{}>;
 declare const LOGR: {
     get_instance(): any;
+    _reset_for_testing(): void;
 };
 export { LOGR, l_length_ as l_length, l_array_ as l_array, l_concat_ as l_concat, l_merge_ as l_merge, l_LL_ as l_LL, l_RR_ as l_RR, };
