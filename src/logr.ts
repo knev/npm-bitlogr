@@ -192,7 +192,7 @@ type LogrOptions = {
 };
 
 const LOGR = (function () {
-	// let _instance; // Private variable to hold the single instance
+	let _instance; // Private variable to hold the single instance
 
 	// Module-level state would work - but only when the module is loaded once. 
 	// Your bundler is currently bundling @knev/bitlogr into your distribution file, 
@@ -271,14 +271,16 @@ const LOGR = (function () {
 	// Public interface
     return {
         get_instance() {
-			// if (!_instance)
-			// 	_instance = _create_instance(); // Lazy initialization
-			// return _instance;
+			if ((globalThis as any).LOGR_USE_GLOBAL_KEY ?? false) {
+				if (!globalThis[GLOBAL_KEY])
+					globalThis[GLOBAL_KEY] = _create_instance();
 
-			if (!globalThis[GLOBAL_KEY])
-                globalThis[GLOBAL_KEY] = _create_instance();
+				return globalThis[GLOBAL_KEY];
+			}
 
-			return globalThis[GLOBAL_KEY];
+			if (!_instance)
+				_instance = _create_instance(); // Lazy initialization
+			return _instance;
         },
 
         // For testing only - reset the singleton

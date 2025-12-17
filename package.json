@@ -12,11 +12,11 @@
 		"default": "./dist/logr.es.mjs"
 	},
 	"scripts": {
-		"build": "rollup --config",
+		"build": "rollup --config && cp dist/logr.es.mjs spec/logr-copy.es.mjs",
 		"test": "jasmine",
 		"test-dev": "NODE_ENV=development rollup -c && TEST_MODE=dev npx jasmine spec/build.mjs",
 		"test-prod": "NODE_ENV=production rollup -c && TEST_MODE=prod npx jasmine spec/build.mjs",
-		"clean": "del-cli dist && echo OK"
+		"clean": "del-cli dist && del-cli spec/logr-copy.es.mjs && echo OK"
 	},
 	"repository": {
 		"type": "git",

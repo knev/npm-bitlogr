@@ -1,2 +1,3 @@
 .DS_Store
 node_modules
+spec/logr-copy.es.mjs
