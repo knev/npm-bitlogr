@@ -3,7 +3,7 @@
 	"version": "3.0.6",
 	"description": "",
 	"main": "./dist/logr.es.mjs",
-	"types": "dist/index.d.ts",
+	"types": "dist/logr.d.ts",
 	"exports": {
 		"node": {
 			"module": "./dist/logr.es.mjs",
