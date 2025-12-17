@@ -271,16 +271,16 @@ const LOGR = (function () {
 	// Public interface
     return {
         get_instance() {
-			if ((globalThis as any).LOGR_USE_GLOBAL_KEY ?? false) {
-				if (!globalThis[GLOBAL_KEY])
-					globalThis[GLOBAL_KEY] = _create_instance();
-
-				return globalThis[GLOBAL_KEY];
+			if (! ((globalThis as any).LOGR_USE_GLOBAL_KEY ?? true)) {
+				if (!_instance)
+					_instance = _create_instance(); // Lazy initialization
+				return _instance;
 			}
 
-			if (!_instance)
-				_instance = _create_instance(); // Lazy initialization
-			return _instance;
+			if (!globalThis[GLOBAL_KEY])
+				globalThis[GLOBAL_KEY] = _create_instance();
+
+			return globalThis[GLOBAL_KEY];
         },
 
         // For testing only - reset the singleton

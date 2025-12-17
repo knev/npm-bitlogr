@@ -974,7 +974,14 @@ describe("LOGR(root);", () => {
 	});
 
 	describe("Simulated Bundle Duplication", () => {
-		it("Default- use private _instance variable", async () => {
+		it("should demonstrate the problem of bundled duplicates", async () => {
+			// Forcefully set LOGR_ENABLED to false for these tests
+			Object.defineProperty(globalThis, 'LOGR_USE_GLOBAL_KEY', {
+				value: false,
+				writable: true,
+				configurable: true
+			});
+
 			const bundle1 = await import('../dist/logr.es.mjs');
 			const bundle2 = await import('./logr-copy.es.mjs');
 			
@@ -993,16 +1000,12 @@ describe("LOGR(root);", () => {
 			// Bundle 2 doesn't see it
 			expect(logr1.toggled).toBe(BigInt(1));
 			expect(logr2.toggled).toBe(BigInt(0)); // Still zero!
+
+			// Clean up to avoid affecting other tests
+			delete globalThis.LOGR_USE_GLOBAL_KEY;
 		});
 
-		it("should demonstrate the problem of bundled duplicates", async () => {
-			// Forcefully set LOGR_ENABLED to false for these tests
-			Object.defineProperty(globalThis, 'LOGR_USE_GLOBAL_KEY', {
-				value: true,
-				writable: true,
-				configurable: true
-			});
-
+		it("Default- use GLOBAL_KEY variable", async () => {
 			const bundle1 = await import('../dist/logr.es.mjs');
 			const bundle2 = await import('./logr-copy.es.mjs');
 			
@@ -1012,7 +1015,6 @@ describe("LOGR(root);", () => {
 			// console.log('Bundle 1 instance ID:', logr1._id);
 			// console.log('Bundle 2 instance ID:', logr2._id);
 			
-			// These should be different (demonstrating the problem)
 			expect(logr1._id).toBe(logr2._id);
 			
 			// Toggle in bundle 1
@@ -1021,9 +1023,6 @@ describe("LOGR(root);", () => {
 			// Bundle 2 doesn't see it
 			expect(logr1.toggled).toBe(BigInt(1));
 			expect(logr2.toggled).toBe(BigInt(1));
-
-			// Clean up to avoid affecting other tests
-			delete global.LOGR_ENABLED;
 		});
 	});
 
