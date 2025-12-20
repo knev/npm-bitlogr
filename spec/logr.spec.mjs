@@ -1,5 +1,5 @@
 
-import { LOGR, l_length, l_array, l_concat, l_merge, l_LL, l_RR } from '../dist/logr.es.mjs';
+import { LOGR, lRef, l_length, l_array, l_concat, l_merge, l_LL, l_RR } from '../dist/logr.es.mjs';
 import { l as module_l_, log_as_member } from './module.mjs';
 
 describe("LOGR(root);", () => {
@@ -458,7 +458,7 @@ describe("LOGR(root);", () => {
 
 		beforeEach(() => {
 			LOGR_= LOGR.get_instance();
-			const logr_ = LOGR_.create({ labels: module_l_ });
+			// const logr_ = LOGR_.create({ labels: module_l_ });
 
 			LOGR_.toggle(module_l_, {}); // reset the labels back to that of submodule
 
@@ -471,7 +471,45 @@ describe("LOGR(root);", () => {
 			console.log.calls.reset();
 		});
 	
-		it("should initialize with default values", () => {
+		fit("lRef", () => {
+			let options= {
+				labels : l_
+			}
+			expect(options.labels ?? undefined).toEqual({ 
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			});			
+
+			const lref_undef = lRef(undefined);
+			expect(lref_undef).toBe(undefined);
+
+			options= {}
+			expect( lRef(options.labels) ?? undefined ).toEqual(undefined);	
+
+			options= {
+				labels: {}
+			}
+			expect( (lRef(options.labels) ?? undefined).get() ).toEqual({});	
+
+			const lref = lRef(l_);
+			expect(lref.get()).toEqual({ 
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			});			
+
+			let logr_;
+			
+			logr_= LOGR_.create();
+			expect(logr_.lref).toBe(undefined);
+
+			logr_= LOGR_.create({ labels: l_ });
+			expect(logr_.lref.get()).toEqual({ 
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			});			
+		});
+
+		it("should initialize with default values, toggle", () => {
 			expect(LOGR_.toggled).toBe(0n);
 			expect(() => {
 				LOGR_.toggle(null, {

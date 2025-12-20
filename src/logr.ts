@@ -186,9 +186,108 @@ function l_toBigInt_(obj_labels, obj, ignore= false) {
 
 // console.log(l_toBigInt_({},{}))
 
+/*
+const lRef = (initial = null) => {
+  let value = initial;
+  return {
+    get: () => value,
+    set: (newVal) => { value = newVal; }
+  };
+};
+*/
+
+function lRef<T>(initial: T): { get: () => T; set: (v: T) => void };
+function lRef<T>(initial?: T) {
+	if (arguments.length === 0 || initial === undefined) {
+		return undefined as any;
+	}
+
+	let value = initial;
+	return {
+		get: () => value,
+		set: (newVal: T) => { value = newVal; }
+	};
+}
+
+/*
+const l_ = {
+	get VALIDATION() { return logr_.lref.get().VALIDATION; }
+}
+
+function createBitFlags(ref) {
+	// Create a proxy so that any property access computes the current bit
+	return new Proxy({}, {
+		get(target, prop, receiver) {
+			const positions = ref.get();           // get current { VALIDATION: n, ... }
+			const position = positions[prop];      // e.g., positions['VALIDATION']
+
+			if (position === undefined) {
+				// Optional: warn or return 0 for unknown keys
+				console.warn(`Unknown bitflag key: ${String(prop)}`);
+				return 0;
+			}
+
+			return 0b1 << position;  // or 1 << position
+		},
+
+		// Optional: make Object.keys(l_) show the actual keys
+		ownKeys(target) {
+			return Object.keys(ref.get());
+		},
+
+		getOwnPropertyDescriptor(target, prop) {
+			return {
+				enumerable: true,
+				configurable: true,
+			};
+		}
+	});
+}
+
+type BitPositions = Record<string, number>;
+
+function createBitFlags<T extends BitPositions>(ref: { get: () => T }) {
+	return new Proxy({} as { [K in keyof T]: number }, {
+		get(target, prop: string | symbol) {
+			if (typeof prop !== 'string') return undefined;
+			const positions = ref.get();
+			const position = positions[prop as keyof T];
+			if (position === undefined) return 0;
+			return 1 << position;
+		},
+		ownKeys() {
+			return Object.keys(ref.get());
+		},
+		getOwnPropertyDescriptor() {
+			return { enumerable: true, configurable: true };
+		}
+	});
+}
+*/
+type BitPositions = Record<string, number>;
+
+function create_Referenced_l_<T extends BitPositions>(ref: { get: () => T }) {
+	return new Proxy({} as { [K in keyof T]: number }, {
+		get(target, prop: string | symbol) {
+			if (typeof prop !== 'string') return undefined;
+			const positions = ref.get();
+			const value = positions[prop as keyof T];
+			if (value === undefined) return 0;
+			return value;
+		},
+		ownKeys() {
+			return Object.keys(ref.get());
+		},
+		getOwnPropertyDescriptor() {
+			return { enumerable: true, configurable: true };
+		}
+	});
+}
+
 type LogrOptions = {
-  labels?: Record<string, number>;
-  log_handler?: ((...args: any[]) => void);
+	//   labels?: Record<string, number>;
+	arr_labels? : Array<string>;
+	log_handler?: ((...args: any[]) => void);
 };
 
 const LOGR = (function () {
@@ -212,6 +311,7 @@ const LOGR = (function () {
 		let _handler_log = handler_default_;
 
 		function _log_fxn(nr_logged, argsFn /* args */) {
+			// console.log('_log_fxn: ', BigInt(nr_logged), _Bint_toggled, (BigInt(nr_logged) & _Bint_toggled));
 			if ((BigInt(nr_logged) & _Bint_toggled) === BigInt(0))
 				return;
 
@@ -246,7 +346,15 @@ const LOGR = (function () {
 				}
 
 				const _logger = {
-					_obj_labels: options.labels ?? undefined,
+					// _lref_labels: (options.labels === undefined) ? undefined : lRef(options.labels),
+					_lref_labels: lRef( l_array_(options.arr_labels) ),
+
+					get l() { return create_Referenced_l_(this._lref_labels); },
+
+					get lref() { return this._lref_labels; },
+					set lref(lref_labels_new) {
+						this._lref_labels = lref_labels_new;
+					},
 
 					log(nr_logged, argsFn) {
 						// This constant will be replaced at build time
@@ -304,6 +412,8 @@ const LOGR = (function () {
 
 export { 
 	LOGR, 
+	lRef,
+	create_Referenced_l_ as _create_Referenced_l,
 	l_length_ as l_length,
 	l_array_ as l_array,
 	l_concat_ as l_concat,
