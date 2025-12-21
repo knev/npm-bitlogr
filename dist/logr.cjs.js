@@ -142,19 +142,114 @@ function handler_default_( /* ... */) {
     var args = Array.prototype.slice.call(arguments);
     console.log.apply(console, args);
 }
-//-------------------------------------------------------------------------------------------------
 function l_toBigInt_(obj_labels, obj, ignore = false) {
     if (!obj_labels || typeof obj_labels !== 'object')
         throw new Error('obj_labels must be an object');
     if (!obj || typeof obj !== 'object')
         throw new Error('obj must be an object');
-    let bigInt = BigInt(0);
+    let bigint_l = BigInt(0);
     for (const [k, v] of Object.entries(obj)) {
         if ((ignore || v) && obj_labels[k] !== undefined && typeof obj_labels[k] === 'number')
-            bigInt |= BigInt(obj_labels[k]);
+            bigint_l |= BigInt(obj_labels[k]);
         // console.log('0b'+ bigInt.toString(2) );
     }
-    return bigInt;
+    return bigint_l;
+}
+function lRef(initial) {
+    if (arguments.length === 0 || initial === undefined) {
+        return undefined;
+    }
+    let value = initial;
+    return {
+        get: () => value,
+        set: (newVal) => { value = newVal; }
+    };
+}
+/*
+const l_ = {
+    get VALIDATION() { return logr_.lref.get().VALIDATION; }
+}
+
+function createBitFlags(ref) {
+    // Create a proxy so that any property access computes the current bit
+    return new Proxy({}, {
+        get(target, prop, receiver) {
+            const positions = ref.get();           // get current { VALIDATION: n, ... }
+            const position = positions[prop];      // e.g., positions['VALIDATION']
+
+            if (position === undefined) {
+                // Optional: warn or return 0 for unknown keys
+                console.warn(`Unknown bitflag key: ${String(prop)}`);
+                return 0;
+            }
+
+            return 0b1 << position;  // or 1 << position
+        },
+
+        // Optional: make Object.keys(l_) show the actual keys
+        ownKeys(target) {
+            return Object.keys(ref.get());
+        },
+
+        getOwnPropertyDescriptor(target, prop) {
+            return {
+                enumerable: true,
+                configurable: true,
+            };
+        }
+    });
+}
+
+type BitPositions = Record<string, number>;
+
+function createBitFlags<T extends BitPositions>(ref: { get: () => T }) {
+    return new Proxy({} as { [K in keyof T]: number }, {
+        get(target, prop: string | symbol) {
+            if (typeof prop !== 'string') return undefined;
+            const positions = ref.get();
+            const position = positions[prop as keyof T];
+            if (position === undefined) return 0;
+            return 1 << position;
+        },
+        ownKeys() {
+            return Object.keys(ref.get());
+        },
+        getOwnPropertyDescriptor() {
+            return { enumerable: true, configurable: true };
+        }
+    });
+}
+*/
+function create_Referenced_l_(ref) {
+    return new Proxy({}, {
+        get(target, prop) {
+            if (typeof prop !== 'string')
+                return undefined;
+            // if (prop === 'get') {
+            // 	return () => {
+            // 		const positions = ref.get();
+            // 		const result: Partial<Record<keyof T, number>> = {};
+            // 		for (const key in positions) {
+            // 			result[key as keyof T] = positions[key];
+            // 		}
+            // 		return result as Record<keyof T, number>;
+            // 	};
+            // }
+            if (prop === 'get')
+                return () => ref.get();
+            const positions = ref.get();
+            const value = positions[prop];
+            if (value === undefined)
+                return 0;
+            return value;
+        },
+        ownKeys() {
+            return Object.keys(ref.get());
+        },
+        getOwnPropertyDescriptor() {
+            return { enumerable: true, configurable: true };
+        }
+    });
 }
 const LOGR = (function () {
     let _instance; // Private variable to hold the single instance
@@ -173,6 +268,7 @@ const LOGR = (function () {
         let _Bint_toggled = BigInt(0);
         let _handler_log = handler_default_;
         function _log_fxn(nr_logged, argsFn /* args */) {
+            // console.log('_log_fxn: ', BigInt(nr_logged), _Bint_toggled, (BigInt(nr_logged) & _Bint_toggled));
             if ((BigInt(nr_logged) & _Bint_toggled) === BigInt(0))
                 return;
             const args = argsFn();
@@ -185,7 +281,14 @@ const LOGR = (function () {
                 _handler_log = fx;
             },
             get toggled() { return _Bint_toggled; },
-            toggle(obj_labels, obj_toggled) {
+            // toggle(obj_labels, obj_toggled) {
+            // 	_Bint_toggled= l_toBigInt_(obj_labels, obj_toggled);
+            // },
+            toggle(labels, obj_toggled) {
+                const obj_labels = typeof labels?.get === 'function'
+                    ? labels.get()
+                    : labels;
+                // console.log('obj_labels', obj_labels)
                 _Bint_toggled = l_toBigInt_(obj_labels, obj_toggled);
             },
             // Core internal log function (exposed only to created loggers)
@@ -200,7 +303,20 @@ const LOGR = (function () {
                     };
                 }
                 const _logger = {
-                    _obj_labels: options.labels ?? undefined,
+                    // _lref_labels: (options.arr_labels === undefined) ? undefined : lRef( l_array_(options.arr_labels) ),
+                    _lref_labels: (options.labels === undefined)
+                        ? undefined
+                        : lRef(options.labels),
+                    get l() {
+                        // Always create a fresh proxy pointing to the current labels
+                        return create_Referenced_l_({
+                            get: () => this._lref_labels?.get() || {}
+                        });
+                    },
+                    get lref() { return this._lref_labels; },
+                    set lref(lref_labels_new) {
+                        this._lref_labels = lref_labels_new;
+                    },
                     log(nr_logged, argsFn) {
                         // This constant will be replaced at build time
                         if (!(globalThis.LOGR_ENABLED ?? true))
@@ -219,14 +335,14 @@ const LOGR = (function () {
     // Public interface
     return {
         get_instance() {
-            if (globalThis.LOGR_USE_GLOBAL_KEY ?? false) {
-                if (!globalThis[GLOBAL_KEY])
-                    globalThis[GLOBAL_KEY] = _create_instance();
-                return globalThis[GLOBAL_KEY];
+            if (!(globalThis.LOGR_USE_GLOBAL_KEY ?? true)) {
+                if (!_instance)
+                    _instance = _create_instance(); // Lazy initialization
+                return _instance;
             }
-            if (!_instance)
-                _instance = _create_instance(); // Lazy initialization
-            return _instance;
+            if (!globalThis[GLOBAL_KEY])
+                globalThis[GLOBAL_KEY] = _create_instance();
+            return globalThis[GLOBAL_KEY];
         },
         // For testing only - reset the singleton
         _reset_for_testing() {
@@ -236,6 +352,8 @@ const LOGR = (function () {
 })();
 
 exports.LOGR = LOGR;
+exports._create_Referenced_l = create_Referenced_l_;
+exports.lRef = lRef;
 exports.l_LL = l_LL_;
 exports.l_RR = l_RR_;
 exports.l_array = l_array_;
