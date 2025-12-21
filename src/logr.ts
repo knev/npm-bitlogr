@@ -198,7 +198,13 @@ const lRef = (initial = null) => {
 };
 */
 
-function lRef<T>(initial: T): { get: () => T; set: (v: T) => void };
+type LRef<T> = {
+    get: () => T;
+    set: (v: T) => void;
+};
+
+function lRef<T>(initial: T): LRef<T>;
+function lRef<T>(initial?: T): LRef<T> | undefined;
 function lRef<T>(initial?: T) {
 	if (arguments.length === 0 || initial === undefined) {
 		return undefined as any;
@@ -266,12 +272,27 @@ function createBitFlags<T extends BitPositions>(ref: { get: () => T }) {
 	});
 }
 */
-type BitPositions = Record<string, number>;
 
-function create_Referenced_l_<T extends BitPositions>(ref: { get: () => T }) {
-	return new Proxy({} as { [K in keyof T]: number }, {
+function create_Referenced_l_<T extends LabelsRecord>(ref: { get: () => T }) {
+	type Flags = { [K in keyof T]: number } & { get(): Record<keyof T, number> };
+
+	return new Proxy({} as Flags, {
 		get(target, prop: string | symbol) {
 			if (typeof prop !== 'string') return undefined;
+
+			// if (prop === 'get') {
+			// 	return () => {
+			// 		const positions = ref.get();
+			// 		const result: Partial<Record<keyof T, number>> = {};
+			// 		for (const key in positions) {
+			// 			result[key as keyof T] = positions[key];
+			// 		}
+			// 		return result as Record<keyof T, number>;
+			// 	};
+			// }
+			if (prop === 'get')
+				return () => ref.get();
+
 			const positions = ref.get();
 			const value = positions[prop as keyof T];
 			if (value === undefined) return 0;
@@ -287,8 +308,8 @@ function create_Referenced_l_<T extends BitPositions>(ref: { get: () => T }) {
 }
 
 type LogrOptions = {
-	//   labels?: Record<string, number>;
-	arr_labels? : Array<string>;
+	labels?: LabelsRecord;
+	// arr_labels? : Array<string>;
 	log_handler?: ((...args: any[]) => void);
 };
 
@@ -309,7 +330,7 @@ const LOGR = (function () {
 			console.log('creating LOGR instance:', _id);
 
 		// Private state (replacing constructor properties)
-		let _Bint_toggled = BigInt(0);
+		let _Bint_toggled: bigint = BigInt(0);
 		let _handler_log = handler_default_;
 
 		function _log_fxn(nr_logged, argsFn /* args */) {
@@ -329,9 +350,18 @@ const LOGR = (function () {
 				_handler_log = fx;
 			},
 
-			get toggled() { return _Bint_toggled; },
-			toggle(obj_labels, obj_toggled) {
-				_Bint_toggled= l_toBigInt_(obj_labels, obj_toggled);
+			get toggled() : bigint { return _Bint_toggled; },
+			// toggle(obj_labels, obj_toggled) {
+			// 	_Bint_toggled= l_toBigInt_(obj_labels, obj_toggled);
+			// },
+			toggle(labels: LRef<LabelsRecord> | LabelsRecord, obj_toggled: Record<string, boolean>): void {
+				const obj_labels = typeof labels?.get === 'function'
+					? (labels as LRef<LabelsRecord>).get()
+					: labels as LabelsRecord;
+
+				// console.log('obj_labels', obj_labels)
+
+				_Bint_toggled = l_toBigInt_(obj_labels, obj_toggled);
 			},
 
 			 // Core internal log function (exposed only to created loggers)
@@ -348,13 +378,20 @@ const LOGR = (function () {
 				}
 
 				const _logger = {
-					// _lref_labels: (options.labels === undefined) ? undefined : lRef(options.labels),
-					_lref_labels: lRef( l_array_(options.arr_labels) ),
+					// _lref_labels: (options.arr_labels === undefined) ? undefined : lRef( l_array_(options.arr_labels) ),
+					_lref_labels: (options.labels === undefined) 
+						? undefined 
+						: lRef( options.labels ) as undefined | LRef<LabelsRecord>,
 
-					get l() { return create_Referenced_l_(this._lref_labels); },
+					get l() { 
+						// Always create a fresh proxy pointing to the current labels
+						return create_Referenced_l_({
+							get: () => this._lref_labels?.get() || {}
+						});
+					},					
 
-					get lref() { return this._lref_labels; },
-					set lref(lref_labels_new) {
+					get lref(): undefined | LRef<LabelsRecord> { return this._lref_labels; },
+					set lref(lref_labels_new: LRef<LabelsRecord>) {
 						this._lref_labels = lref_labels_new;
 					},
 

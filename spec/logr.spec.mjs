@@ -1,6 +1,6 @@
 
-import { LOGR, lRef, l_length, l_array, l_concat, l_merge, l_LL, l_RR } from '../dist/logr.es.mjs';
-import { l as module_l_, log_as_member } from './module.mjs';
+import { LOGR, lRef, l_length, l_array, l_concat, l_merge, l_LL, l_RR, _create_Referenced_l } from '../dist/logr.es.mjs';
+import * as module_ from './module.mjs';
 
 describe("LOGR(root);", () => {
 
@@ -451,16 +451,12 @@ describe("LOGR(root);", () => {
 
 	describe("LOGR;", () => {
 		let LOGR_;
-		const l_= {
-			DEL : 0b1 << 0,		// removed
-			CXNS : 0b1 << 2,	// connections
-		}
 
 		beforeEach(() => {
 			LOGR_= LOGR.get_instance();
 			// const logr_ = LOGR_.create({ labels: module_l_ });
 
-			LOGR_.toggle(module_l_, {}); // reset the labels back to that of submodule
+			LOGR_.toggle(module_.logr_.lref.get(), {}); // reset the labels back to that of submodule
 
 			// Spy on console.log before each test
 			spyOn(console, "log").and.callThrough(); // callThrough ensures the original console.log still executes
@@ -471,27 +467,24 @@ describe("LOGR(root);", () => {
 			console.log.calls.reset();
 		});
 	
-		fit("lRef", () => {
-			let options= {
-				labels : l_
-			}
-			expect(options.labels ?? undefined).toEqual({ 
-				DEL : 0b1 << 0,		// removed
-				CXNS : 0b1 << 2,	// connections
-			});			
+		it("lRef", () => {
+			let options;
 
 			const lref_undef = lRef(undefined);
 			expect(lref_undef).toBe(undefined);
 
 			options= {}
-			expect( lRef(options.labels) ?? undefined ).toEqual(undefined);	
+			expect( lRef(options.arr_labels) ?? undefined ).toEqual(undefined);	
 
 			options= {
 				labels: {}
 			}
 			expect( (lRef(options.labels) ?? undefined).get() ).toEqual({});	
 
-			const lref = lRef(l_);
+			const lref = lRef({
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			});
 			expect(lref.get()).toEqual({ 
 				DEL : 0b1 << 0,		// removed
 				CXNS : 0b1 << 2,	// connections
@@ -502,11 +495,72 @@ describe("LOGR(root);", () => {
 			logr_= LOGR_.create();
 			expect(logr_.lref).toBe(undefined);
 
-			logr_= LOGR_.create({ labels: l_ });
+			logr_= LOGR_.create({ 
+				labels: {
+					DEL : 0b1 << 0,		// removed
+					CXNS : 0b1 << 2,	// connections
+				} 
+			});
+
 			expect(logr_.lref.get()).toEqual({ 
 				DEL : 0b1 << 0,		// removed
 				CXNS : 0b1 << 2,	// connections
 			});			
+
+			expect(logr_.l.get()).toEqual({ 
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			});			
+
+		});
+
+		it("_create_Referenced_l", () => {
+			// const logr_ = LOGR_.create({ 
+			// 	labels: {
+			// 		CXNS : 0b1 << 2,	// connections
+			// 		EVENTS : 0b1 << 3,
+			// 		HANDLERS : 0b1 << 4,
+			// 	}
+			// });
+			const lref_orig= module_.logr_.lref;
+
+			expect(module_.logr_.lref.get()).toEqual({ 
+				CXNS : 0b1 << 2,	// connections
+				EVENTS : 0b1 << 3,
+				HANDLERS : 0b1 << 4,
+			});			
+			const module_l_= module_.logr_.l;
+			expect(module_l_.CXNS).toBe(4);
+			expect(module_l_.EVENTS).toBe(8);
+			expect(module_l_.HANDLERS).toBe(16);
+
+			const labels_shift_= l_LL(module_.logr_.lref.get(), 2);
+			expect(labels_shift_).toEqual({ 
+				CXNS : 0b1 << 4,	// connections
+				EVENTS : 0b1 << 5,
+				HANDLERS : 0b1 << 6,
+			});			
+			const lref_shift_= lRef(labels_shift_);
+			// const l_shift = _create_Referenced_l(lref_shift_)
+			// expect(l_shift.get()).toEqual({ 
+			// 	CXNS : 0b1 << 4,	// connections
+			// 	EVENTS : 0b1 << 5,
+			// 	HANDLERS : 0b1 << 6,
+			// });			
+			
+			module_.logr_.lref= lref_shift_;
+			expect(module_.logr_.lref.get()).toEqual({ 
+				CXNS : 0b1 << 4,	// connections
+				EVENTS : 0b1 << 5,
+				HANDLERS : 0b1 << 6,
+			});
+
+			console.log('###############')
+			module_.log_as_member();
+			console.log('###############')
+
+			// reset
+			module_.logr_.lref= lref_orig;
 		});
 
 		it("should initialize with default values, toggle", () => {
@@ -517,6 +571,41 @@ describe("LOGR(root);", () => {
 					// CXNS: true
 				});
 			}).toThrowError(Error, "obj_labels must be an object");
+
+			const l_lots_ = { 
+				CXNS : 0b1 << 2,	// connections
+				MEMORY : 0b1 << 3,
+				RUNTIME : 0b1 << 4,
+				EVENTS : 0b1 << 5,
+				HANDLERS : 0b1 << 6,
+				MORE: 0b1 << 7, 
+				EXTRA: 0b1 << 8 
+			};
+
+			// order shouldn't matter
+
+			LOGR_.toggle(l_lots_, {
+				CXNS:  true,
+				EVENTS: true,
+				MORE: true
+			});
+			expect(LOGR_.toggled).toBe(164n);
+
+			LOGR_.toggle(l_lots_, {
+				MORE: true,
+				CXNS:  true,
+				EVENTS: true
+			});
+			expect(LOGR_.toggled).toBe(164n);
+
+			const lref_lots= lRef(l_lots_);
+			LOGR_.toggle(lref_lots, {
+				MORE: true,
+				CXNS:  true,
+				EVENTS: true
+			});
+			expect(LOGR_.toggled).toBe(164n);
+
 		});
 
 		it("should verify the handler changes when explicitly overridden", () => {
@@ -534,8 +623,14 @@ describe("LOGR(root);", () => {
 			// Spy on the handler to observe calls
 			const handlerSpy = jasmine.createSpy('handlerSpy');
 			LOGR_.handler = handlerSpy;
-			const logr_ = LOGR_.create({ labels: l_ });
-	
+			const logr_= LOGR_.create({ 
+				labels: {
+					DEL : 0b1 << 0,		// removed
+					CXNS : 0b1 << 2,	// connections
+				} 
+			});
+			const l_= logr_.l;
+			
 			// Initial state: toggled is unset, _log_fxn should be NOP
 			logr_.log(l_.DEL, 'Initial message');
 			expect(handlerSpy).not.toHaveBeenCalled(); // NOP behavior
@@ -584,11 +679,7 @@ describe("LOGR(root);", () => {
 		let consoleSpy;
 
 		let local_logr_;
-		const local_l_= {
-			DEL : 0b1 << 0,		// removed
-			CXNS : 0b1 << 2,	// connections
-		}
-
+		
 		const LOGR_= LOGR.get_instance();
 		
 		// Define the default handler explicitly if not exported
@@ -600,7 +691,12 @@ describe("LOGR(root);", () => {
 		});
 	
 		beforeEach(() => {
-			local_logr_ = LOGR_.create({ labels: module_l_ });
+			local_logr_ = LOGR_.create({ 
+				labels: { 
+					DEL : 0b1 << 0,		// removed
+					CXNS : 0b1 << 2,	// connections
+				}
+			});
 			LOGR_.handler = defaultHandler; // Ensure handler per test
 			consoleSpy = spyOn(console, "log"); //.and.callThrough();
 		});
@@ -611,28 +707,31 @@ describe("LOGR(root);", () => {
 		});
 
 		it('module.mjs', () => {
-			LOGR_.toggle(module_l_, {
+			LOGR_.toggle(module_.logr_.lref.get(), {
 				EVENTS : true
 			});
 
-			log_as_member(); // should fire, because module toggles EVENTS
-			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
-			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an CXNS");
+			module_.log_as_member(); // should fire, because module toggles EVENTS
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT, value of:", 8);
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an CXNS, value of:", 4);
 		});
 
 		it("local_LOGR_ should fire, module LOGR_ should NOT", () => {
-			expect(local_l_).toEqual({ 
+			expect(local_logr_.lref.get()).toEqual({ 
 				DEL : 0b1 << 0,		// removed
 				CXNS : 0b1 << 2,	// connections
 			});
-			expect(module_l_).toEqual({ 
+			expect(module_.logr_.lref.get()).toEqual({ 
 				CXNS : 0b1 << 2,	// connections
 				EVENTS : 0b1 << 3,
 				HANDLERS : 0b1 << 4,
 			});
+			const local_l_= local_logr_.l;
+			const module_l_= module_.logr_.l;
+
 			expect(local_l_.CXNS === module_l_.CXNS);
 
-			LOGR_.toggle(local_l_, {
+			LOGR_.toggle(local_logr_.lref.get(), {
 				DEL : true,
 				CXNS : true
 			});
@@ -640,39 +739,52 @@ describe("LOGR(root);", () => {
 			local_logr_.log(local_l_.DEL, () => ["local_LOGR_: This should log"]);
 			expect(consoleSpy).toHaveBeenCalledWith("local_LOGR_: This should log");
 
-			log_as_member(); 
+			module_.log_as_member(); 
 			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
-			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an CXNS");
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an CXNS, value of:", 4);
 		});
 
 		it("module LOGR_ should fire again", () => {
-			LOGR_.toggle(module_l_, {
+			LOGR_.toggle(module_.logr_.lref.get(), {
 				EVENTS : true
 			});
 
-			log_as_member();
-			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
-			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an CXNS");
+			module_.log_as_member();
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT, value of:", 8);
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an CXNS, value of:", 4);
 		});
 
 		it("forget to update labels", () => {
-			LOGR_.toggle(module_l_, {
+			LOGR_.toggle(module_.logr_.lref.get(), {
 				DEL : true
 			});
+			const l_= local_logr_.l;
 
-			local_logr_.log(local_l_.DEL, () => ["local module_LOGR_: This should NOT log"]);
+			local_logr_.log(l_.DEL, () => ["local module_LOGR_: This should NOT log"]);
 			expect(consoleSpy).not.toHaveBeenCalledWith("local module_LOGR_: This should NOT log");
 		});
 
 		it("Borrow module_LOGR_", () => {
-			const l_= l_merge(module_l_, local_l_);
-			expect(l_).toEqual({ 
+			expect(local_logr_.lref.get()).toEqual({ 
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			});
+			const local_l_= local_logr_.l;
+			expect(module_.logr_.lref.get()).toEqual({ 
+				CXNS : 0b1 << 2,	// connections
+				EVENTS : 0b1 << 3,
+				HANDLERS : 0b1 << 4,
+			});
+
+			const labels_= l_merge(module_.logr_.lref.get(), local_logr_.lref.get());
+			console.log(labels_);
+			expect(labels_).toEqual({ 
 				EVENTS : 0b1 << 3,
 				HANDLERS : 0b1 << 4,
 				DEL : 0b1 << 0,		// removed
 				CXNS : 0b1 << 2,	// connections
 			});
-			LOGR_.toggle(l_, {
+			LOGR_.toggle(labels_, {
 				DEL : true,
 				EVENTS :  true
 			});
@@ -680,61 +792,65 @@ describe("LOGR(root);", () => {
 			local_logr_.log(local_l_.DEL, () => ["local module_LOGR_: This should log"]);
 			expect(consoleSpy).toHaveBeenCalledWith("local module_LOGR_: This should log");
 
-			log_as_member();
-			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			module_.log_as_member();
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT, value of:", 8);
 		});
 
-		it("reassigning a new name to sub-module keys", () => {
-			expect(local_l_).toEqual({ 
+		fit("reassigning a new name to sub-module keys", () => {
+			expect(local_logr_.lref.get()).toEqual({ 
 				DEL : 0b1 << 0,		// removed
 				CXNS : 0b1 << 2,	// connections
 			});
-			expect(module_l_).toEqual({ 
+			// const local_l_= local_logr_.l;
+			expect(module_.logr_.lref.get()).toEqual({ 
 				CXNS : 0b1 << 2,	// connections
 				EVENTS : 0b1 << 3,
 				HANDLERS : 0b1 << 4,
 			});
+			const module_l_= module_.logr_.l;
 
 			LOGR_.toggle(module_l_, {
 				EVENTS : true
 			});
 			expect(LOGR_.toggled).toEqual(BigInt(8));
 
-			log_as_member();
-			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			module_.log_as_member();
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT, value of:", 8);
 			consoleSpy.calls.reset();
+
+			const lref_module_orig= module_.lref;
 
 			// ----
 
-			const conflicting_l_= l_merge({
-				MEMORY : 0b1 << 3,
-				RUNTIME : 0b1 << 4,
-			}, module_l_);
-			// console.warn('conflicting_l_', conflicting_l_);
-			expect(conflicting_l_).toEqual({ 
-				CXNS : 0b1 << 2,	// connections
-				MEMORY : 0b1 << 3,
-				RUNTIME : 0b1 << 4,
-				EVENTS : 0b1 << 5,
-				HANDLERS : 0b1 << 6,
+			const obj_labels_conflicting_= l_merge( l_array(['MEMORY', 'RUNTIME'],8), module_.logr_.lref.get());
+			// console.warn('l_conflicting_', labels_conflicting_);
+			expect(obj_labels_conflicting_).toEqual({ 
+				CXNS : 0b1 << 2,	// 4, connections
+				MEMORY : 0b1 << 3,	// 8
+				RUNTIME : 0b1 << 4, // 16
+				EVENTS : 0b1 << 5,	// 32
+				HANDLERS : 0b1 << 6	// 64
 			});
 
-			// this should NOT cause EVENT to log in module, because the value of EVENTS changed
-			LOGR_.toggle(conflicting_l_, {
+			// this should NOT cause EVENT to log in module, because the value of EVENTS 
+			// changed here, but did not change in the module
+			LOGR_.toggle(obj_labels_conflicting_, {
 				EVENTS : true
 			});
 			expect(LOGR_.toggled).toEqual(BigInt(32));
 
-			log_as_member();
-			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
+			module_.log_as_member();
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT, value of:", 32);
 			consoleSpy.calls.reset();
 
 			// ----
 			// reuse the module_l_ object ...
 
+			const lref_conflicting= lRef(obj_labels_conflicting_);
+
 			// reassign labels in submodule
-			Object.assign(module_l_, conflicting_l_);
-			expect(module_l_).toEqual({ 
+			module_.logr_.lref= lref_conflicting;
+			expect(module_.logr_.lref.get()).toEqual({  
 				CXNS : 0b1 << 2,	// connections
 				MEMORY : 0b1 << 3,
 				RUNTIME : 0b1 << 4,
@@ -742,21 +858,37 @@ describe("LOGR(root);", () => {
 				HANDLERS : 0b1 << 6,
 			});
 
-			log_as_member();
-			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
-			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an CXNS");
+			LOGR_.toggle(obj_labels_conflicting_, {
+				EVENTS : true
+			});
+			expect(LOGR_.toggled).toEqual(BigInt(32));
+
+			module_.log_as_member();
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT, value of:", 32);
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an CXNS, value of:", 4);
 			consoleSpy.calls.reset();
 
 			// ----
 
-			const additional_l_ = l_array(['MORE', 'EXTRA'], 0b1 << 7);
-			expect(additional_l_).toEqual({
+			const obj_additional = l_array(['MORE', 'EXTRA'], 0b1 << 7);
+			expect(obj_additional).toEqual({
 				MORE: 0b1 << 7, 
 				EXTRA: 0b1 << 8 
 			});			
 
-			Object.assign(module_l_, additional_l_);
-			expect(module_l_).toEqual({ 
+			const obj_merge= l_merge(module_.logr_.lref.get(), obj_additional);
+			expect(obj_merge).toEqual({
+				CXNS : 0b1 << 2,	// connections
+				MEMORY : 0b1 << 3,
+				RUNTIME : 0b1 << 4,
+				EVENTS : 0b1 << 5,
+				HANDLERS : 0b1 << 6,
+				MORE: 0b1 << 7, 
+				EXTRA: 0b1 << 8 
+			});			
+
+			module_.logr_.lref.set(obj_merge)
+			expect(module_.logr_.lref.get()).toEqual({ 
 				CXNS : 0b1 << 2,	// connections
 				MEMORY : 0b1 << 3,
 				RUNTIME : 0b1 << 4,
@@ -766,28 +898,28 @@ describe("LOGR(root);", () => {
 				EXTRA: 0b1 << 8 
 			});
 
-			local_logr_ = LOGR_.create({ labels: module_l_ });
-			LOGR_.toggle(module_l_, {
-				CXNS : true,
-				MORE : true
-			});
+			local_logr_ = LOGR_.create({ labels: obj_merge });
+			const local_l_= local_logr_.l;
 
-			local_logr_.log(module_l_.CXNS, () => ["local module_LOGR_: This should log"]);
+			LOGR_.toggle(obj_merge, {
+				CXNS : true,
+				MORE : true,
+			});
+			expect(LOGR_.toggled).toEqual(BigInt(132));
+
+			local_logr_.log(local_l_.CXNS, () => ["local module_LOGR_: This should log"]);
 			expect(consoleSpy).toHaveBeenCalledWith("local module_LOGR_: This should log");
 
-			local_logr_.log(module_l_.MORE, () => ["local module_LOGR_: This should log MORE"]);
+			local_logr_.log(local_l_.MORE, () => ["local module_LOGR_: This should log MORE"]);
 			expect(consoleSpy).toHaveBeenCalledWith("local module_LOGR_: This should log MORE");
 
-			log_as_member();
-			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT");
-			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an CXNS");
+			module_.log_as_member();
+			expect(consoleSpy).not.toHaveBeenCalledWith("module: log_as_member(): log of an EVENT, value of:", 32);
+			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an CXNS, value of:", 4);
 			consoleSpy.calls.reset();
 
 			// reset
-			Object.assign(module_l_, { 
-				EVENTS : 0b1 << 3,
-				HANDLERS : 0b1 << 4,
-			});
+			module_.logr_.lref= lref_module_orig;			
 		});
 
 	});
