@@ -168,20 +168,22 @@ function handler_default_( /* ... */ ) {
 }
 
 //-------------------------------------------------------------------------------------------------
-	
-function l_toBigInt_(obj_labels, obj, ignore= false) {
+
+type LabelsRecord = Record<string, number>;
+
+function l_toBigInt_(obj_labels : LabelsRecord, obj : Record<string, boolean>, ignore= false) : bigint {
     if (! obj_labels || typeof obj_labels !== 'object') 
 		throw new Error('obj_labels must be an object');
     if (! obj || typeof obj !== 'object') 
 		throw new Error('obj must be an object');
 
-	let bigInt = BigInt(0);
+	let bigint_l = BigInt(0);
 	for (const [k,v] of Object.entries(obj)) {
 		if ( ( ignore || v ) && obj_labels[k] !== undefined && typeof obj_labels[k] === 'number')
-			bigInt|= BigInt( obj_labels[k] );			
+			bigint_l|= BigInt( obj_labels[k] );			
 		// console.log('0b'+ bigInt.toString(2) );
 	}
-	return bigInt;
+	return bigint_l;
 }
 
 // console.log(l_toBigInt_({},{}))
