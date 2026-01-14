@@ -2,13 +2,13 @@
 
 **BitLOGR** is a lightweight, bitwise logging library for JavaScript, designed for modular applications with no label dependencies between compilation units. It leverages bit flags for efficient, granular logging control, offering zero performance overhead in production through lazy evaluation (thunks) and build-time optimizations.
 
-The idea behind BitLOGR is to label execution paths, not INFO, WARN, DEBUG, ERROR, CRITICAL.
+The idea behind BitLOGR is to label execution paths (i.e., not INFO, WARN, DEBUG, ERROR and CRITICAL). This means bits could be chosen that correlate to event processing, an execution path or the like.
 ## Key Features (USPs)
 
 - **No Label Dependency**: Each compilation unit can independently define, ignore, inherit, overwrite, or rename labels from submodules.
 - **Flexible Label Management**: Supports custom label sets with bitwise operations for combining and toggling logs.
 - **Custom Logging Handler**: It is possible to specify your own handler (e.g., `console.log`, custom function) for output flexibility.
-- **Minimal Performance Hit (production)**: Use thunks, to defer argument evaluation, and static functions to, ensuring no overhead when logging is disabled.
+- **Minimal Performance Hit**: Use thunks, to defer argument evaluation ensuring minimal overhead when logging is disabled (in production).
 ## Overview
 
 ### Initializing BitLOGR
@@ -139,6 +139,29 @@ LOGR_.toggle(l_, {
 
 logr_.log(l_.EVENT, () => ['Debug warning']); // "WARN: Debug warning"
 ```
+
+**\-- OR --**
+
+```javascript
+const obj_labels_= l_concat(
+		logr_ipsme_.lref.get(), l_array(['DISCOVERY', 'WARP']) 
+	);
+
+let LOGR_ = LOGR.get_instance();
+const logr_ = LOGR_.create({ labels : obj_labels_ });
+const l_= logr_.l;
+
+// doesn't use DISCOVERY AND WARP flags, so don't have to change it
+// logr_ipsme_.lref= lref_; 
+
+console.log('l_', l_.get());
+LOGR_.toggle(l_, {
+    // VALIDATION : true,
+    // DISCOVERY : true,
+    // WARP : true,
+});
+```
+Note above that if the local the logr does not use altered labels such that the labels don't coincide with those of `logr_ipsme_`. That means if the alter labels are toggled, it won't affect the imported module anyways. If the labels were locally alter such that they didn't coincide with `logr_ipsme_`, then it is required to reassign the imported labels to be equal to the locally altered ones.
 
 ### Reassigning Labels from Submodules
 
