@@ -22,6 +22,7 @@ To use BitLOGR, initialize the singleton instance.  Create a local logr with lab
 ```javascript
 import { LOGR, l_array } from '@knev/bitlogr';
 
+const LOGR_= LOGR.get_instance();
 const logr_ = LOGR_.create({
     labels: {
         CXNS : 0b1 << 2,    // connections
@@ -54,7 +55,7 @@ The `log` method takes two arguments:
 2. **argsFn**: A thunk (function returning an array) that lazily provides log arguments.
 
   ```javascript
-LOGR_.log(l_.EVENT, () => ['Debug message']); // Logs if EVENT is toggled
+logr_.log(l_.EVENT, () => ['Debug message']); // Logs if EVENT is toggled
 ```
 
 - Logging occurs only if labels are toggled true; the log function returns true/false in development (i.e., LOGR_ENABLED is true).
@@ -65,13 +66,12 @@ LOGR_.log(l_.EVENT, () => ['Debug message']); // Logs if EVENT is toggled
 Combine labels with the bitwise OR (|) operator to log under multiple categories:
 
 ```javascript
-
 LOGR_.toggle(l_, {
         EVENTS : true,
         CXN: true
     }) // 0b101 (5)
     
-LOGR_.log(l_.EVENT | l_.CXN, () => ['Debug or Info']);
+logr_.log(l_.EVENT | l_.CXN, () => ['Debug or Info']);
 // Logs because 0b101 & (0b001 | 0b100) = 0b101 & 0b101 = 0b101 !== 0
 ```
 
@@ -123,7 +123,24 @@ const l_shifted_ = l_RR(l_, 2); // { A: 1, B: 2 }
 
 ## Examples
 
-### Importing and Reassigning Labels from Submodules
+### Importing Labels from Submodules
+
+```javascript
+import { ..., logr as logr_ } from '@rootintf/json-msg';
+
+console.log('logr_.lref', logr_.lref.get());
+
+const LOGR_= LOGR.get_instance();
+const l_= logr_.l;
+
+LOGR_.toggle(l_, {
+    EVENT : true
+});
+
+logr_.log(l_.EVENT, () => ['Debug warning']); // "WARN: Debug warning"
+```
+
+### Reassigning Labels from Submodules
 
 ```javascript
 import { ..., logr as logr_json_msg_ } from '@rootintf/json-msg'
@@ -162,7 +179,14 @@ LOGR_.handler = (...args) => console.warn('WARN:', ...args);
 LOGR_.toggle(l_, {
         EVENTS : true
     })
-LOGR_.log(l_.EVENT, () => ['Debug warning']); // "WARN: Debug warning"
+    
+logr_.log(l_.EVENT, () => ['Debug warning']); // "WARN: Debug warning"
+```
+
+### Raw logging
+Don't use labels, just log.
+```javascript
+logr_.raw('const l_ ', l_.get())
 ```
 
 ### spec/logr.spec.mjs
@@ -175,9 +199,12 @@ See `spec/logr.spec.mjs` in the source for more examples.
 Set `LOGR_ENABLED = true` (default or via build config) to enable logging:
 
 ```javascript
-LOGR_.toggled = { EVENT: true };
-LOGR_.log(l_.EVENT, () => ['Dev log']); // Logs "Dev log"
-LOGR_.log(l_.CXNS, () => ['No log']); // Skipped
+LOGR_.toggle(l_, {
+        EVENTS : true
+    })
+    
+logr_.log(l_.EVENT, () => ['Dev log']); // Logs "Dev log"
+logr_.log(l_.CXNS, () => ['No log']); // Skipped
 ```
 
 ### Production Mode
@@ -186,7 +213,7 @@ Set `LOGR_ENABLED = false `(e.g., via Webpack `DefinePlugin`) to disable logging
 
 ```javascript
 // In production with LOGR_ENABLED = false
-LOGR_.log(l_.EVENT, () => ['Expensive computation']); // No-op, thunk not evaluated
+logr_.log(l_.EVENT, () => ['Expensive computation']); // No-op, thunk not evaluated
 ```
 
   
@@ -209,6 +236,7 @@ export default [
 	// ...
 	{
 		plugins: [
+			// ...
 			isProduction && terser({
 				compress: {
 					dead_code: true,
