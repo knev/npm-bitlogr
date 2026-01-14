@@ -949,7 +949,6 @@ describe("LOGR(root);", () => {
 			// 	}
 			// });
 			beforeEach(() => {
-				// Forcefully set LOGR_ENABLED to false for these tests
 				Object.defineProperty(globalThis, 'LOGR_ENABLED', {
 					value: true,
 					writable: true,
