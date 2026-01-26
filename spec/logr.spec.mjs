@@ -1,5 +1,5 @@
 
-import { LOGR, lRef, l_length, l_array, l_concat, l_merge, l_LL, l_RR, _create_Referenced_l } from '../dist/logr.es.mjs';
+import { LOGR, lRef, l_length, l_array, l_concat, l_merge, l_LL, l_RR, l_assert, _create_Referenced_l } from '../dist/logr.es.mjs';
 import * as module_ from './module.mjs';
 
 describe("LOGR(root);", () => {
@@ -447,6 +447,93 @@ describe("LOGR(root);", () => {
 
 		});
 
+		describe("l_assert;", () => {
+			const l_= {
+				DEL : 0b1 << 0,		// removed
+				CXNS : 0b1 << 2,	// connections
+			}
+	
+			it("actual empty", () => {
+				expect( l_assert({}, { 
+					DEL : 0b1 << 0,		// removed
+					CXNS : 0b1 << 2,	// connections
+				}) ).toEqual(false);
+			});
+
+			it("expect nothing, all extra", () => {
+				expect( l_assert(l_, { 
+				}) ).toEqual(true);
+			});
+
+			it("assert true", () => {
+				expect( l_assert(l_, { 
+					DEL : 0b1 << 0,		// removed
+					CXNS : 0b1 << 2,	// connections
+				}) ).toEqual(true);
+			});
+
+			it("assert lRef true", () => {
+				const lref_ = lRef(l_);			
+				expect( l_assert(lref_.get(), { 
+					DEL : 0b1 << 0,		// removed
+					CXNS : 0b1 << 2,	// connections
+				}) ).toEqual(true);
+			});
+
+			it("assert more true", () => {
+				const l_AB= {
+					A : 0b1 << 3,
+					B : 0b1 << 5,
+				};
+				const l_new= {
+					...l_,
+					...l_RR(l_AB, 2)
+				}
+				expect( l_assert(l_new, { 
+					DEL : 0b1 << 0,		// removed
+					A : 0b1 << 1,
+					B : 0b1 << 3,
+					CXNS : 0b1 << 2,	// connections
+				}) ).toEqual(true);
+			});
+
+			it("order doesn't matter", () => {
+				expect( l_assert(l_, { 
+					CXNS : 0b1 << 2,	// connections
+					DEL : 0b1 << 0,		// removed
+				}) ).toEqual(true);
+			});
+
+			it("DEL has wrong value", () => {
+				expect( l_assert(l_, { 
+					DEL : 0b1 << 1,		// removed
+					CXNS : 0b1 << 2,	// connections
+				}) ).toEqual(false);
+			});
+
+			it("require less ", () => {
+				expect( l_assert(l_, { 
+					DEL : 0b1 << 0,		// removed
+				}) ).toEqual(true);
+			});
+
+			it("require MORE than exists", () => {
+				expect( l_assert(l_, { 
+					DEL : 0b1 << 0,		// removed
+					MORE : 0b1 << 1,		
+					CXNS : 0b1 << 2,	// connections
+				}) ).toEqual(false);
+			});
+
+			it("conflicting values", () => {
+				expect( l_assert(l_, { 
+					DEL : 0b1 << 2,		// removed
+					CXNS : 0b1 << 2,	// connections
+				}) ).toEqual(false);
+			});
+
+		});
+
 	});
 
 	describe("LOGR;", () => {
@@ -512,6 +599,18 @@ describe("LOGR(root);", () => {
 				CXNS : 0b1 << 2,	// connections
 			});			
 
+			const lref_orig= logr_.lref;
+			logr_.lref.set({ 
+				ADD : 0b1 << 0,		// removed
+				DISCONNECT : 0b1 << 2,	// connections
+			})
+
+			expect(logr_.lref.get()).toEqual({ 
+				ADD : 0b1 << 0,		// removed
+				DISCONNECT : 0b1 << 2,	// connections
+			});			
+
+			expect(logr_.lref == lref_orig).toEqual(true);
 		});
 
 		it("_create_Referenced_l", () => {

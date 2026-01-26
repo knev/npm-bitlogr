@@ -121,6 +121,14 @@ const l_ = { A: 4, B: 8 };
 const l_shifted_ = l_RR(l_, 2); // { A: 1, B: 2 }
 ```
 
+### `l_assert(obj_actual, obj_required)`
+```javascript
+const b_res= l_assert(l_, { 
+		DEL : 0b1 << 0,
+		CXNS : 0b1 << 2,
+	});
+```
+
 ## Examples
 
 ### Importing Labels from Submodules
