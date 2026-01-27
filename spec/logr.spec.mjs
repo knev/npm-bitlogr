@@ -895,7 +895,7 @@ describe("LOGR(root);", () => {
 			expect(consoleSpy).toHaveBeenCalledWith("module: log_as_member(): log of an EVENT, value of:", 8);
 		});
 
-		fit("reassigning a new name to sub-module keys", () => {
+		it("reassigning a new name to sub-module keys", () => {
 			expect(local_logr_.lref.get()).toEqual({ 
 				DEL : 0b1 << 0,		// removed
 				CXNS : 0b1 << 2,	// connections
