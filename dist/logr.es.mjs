@@ -134,6 +134,39 @@ function l_RR_(obj, x) {
     }
     return Object.freeze(obj_new);
 }
+function l_assert_(actual, required) {
+    if (!actual || typeof actual !== 'object')
+        return false;
+    if (!required || typeof required !== 'object')
+        return false;
+    const actualEntries = Object.entries(actual);
+    const requiredEntries = Object.entries(required);
+    // if (actualEntries.length === 0 && expectedEntries.length > 0)
+    // 	return false;
+    const actualValues = new Set();
+    for (const [, v] of actualEntries) {
+        if (typeof v !== 'number' || !Number.isFinite(v))
+            return false;
+        actualValues.add(v);
+    }
+    const usedRequiredValues = new Set();
+    for (const [k, v] of requiredEntries) {
+        if (typeof v !== 'number' || !Number.isFinite(v))
+            return false;
+        if (k in actual) {
+            if (actual[k] !== v)
+                return false;
+        }
+        else {
+            if (!actualValues.has(v))
+                return false;
+        }
+        if (usedRequiredValues.has(v))
+            return false;
+        usedRequiredValues.add(v);
+    }
+    return true;
+}
 //-------------------------------------------------------------------------------------------------
 function handler_default_( /* ... */) {
     // https://stackoverflow.com/questions/18746440/passing-multiple-arguments-to-console-log
@@ -349,4 +382,4 @@ const LOGR = (function () {
     };
 })();
 
-export { LOGR, create_Referenced_l_ as _create_Referenced_l, lRef, l_LL_ as l_LL, l_RR_ as l_RR, l_array_ as l_array, l_concat_ as l_concat, l_length_ as l_length, l_merge_ as l_merge };
+export { LOGR, create_Referenced_l_ as _create_Referenced_l, lRef, l_LL_ as l_LL, l_RR_ as l_RR, l_array_ as l_array, l_assert_ as l_assert, l_concat_ as l_concat, l_length_ as l_length, l_merge_ as l_merge };
