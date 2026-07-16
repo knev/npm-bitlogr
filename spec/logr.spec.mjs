@@ -1,5 +1,5 @@
 
-import { LOGR, lRef, l_length, l_array, l_concat, l_merge, l_LL, l_RR, l_assert, _create_Referenced_l } from '../dist/logr.es.mjs';
+import { LOGR, lRef, l_length, l_array, l_concat, l_merge, l_union, l_LL, l_RR, l_assert, _create_Referenced_l } from '../dist/logr.es.mjs';
 import * as module_ from './module.mjs';
 
 describe("LOGR(root);", () => {
@@ -315,6 +315,105 @@ describe("LOGR(root);", () => {
 				}).toThrowError(Error, "Key 'A' has conflicting values: 8 (obj_labels1) vs 16 (obj_labels2)");
 			});
 
+		});
+
+		describe('l_union;', () => {
+			it('should return a frozen empty object for no args', () => {
+				const l_ = l_union();
+				expect(l_).toEqual({});
+				expect(Object.isFrozen(l_)).toBe(true);
+			});
+
+			it('should return an empty object for all-empty objects', () => {
+				expect(l_union({}, {}, {})).toEqual({});
+			});
+
+			it('should renumber a single object contiguously from bit 0', () => {
+				// incoming values are discarded, names are re-packed from bit 0
+				expect(l_union({ A: 0b1 << 3, B: 0b1 << 1 })).toEqual({
+					A: 0b1 << 0, // 1
+					B: 0b1 << 1  // 2
+				});
+			});
+
+			it('should assign contiguous bits across multiple objects in first-appearance order', () => {
+				const l_ = l_union(
+					{ CONNECTIONS: 1, REFLECTION: 2 },
+					{ VALIDATION: 1 },
+					{ HANDLERS: 8, DROPS: 16 }
+				);
+				expect(l_).toEqual({
+					CONNECTIONS: 0b1 << 0, // 1
+					REFLECTION:  0b1 << 1, // 2
+					VALIDATION:  0b1 << 2, // 4
+					HANDLERS:    0b1 << 3, // 8
+					DROPS:       0b1 << 4  // 16
+				});
+			});
+
+			it('should dedupe a shared name to ONE bit with no throw, even with different incoming values', () => {
+				// l_merge throws here; l_union collapses by name
+				const l_ = l_union({ VALIDATION: 1 }, { VALIDATION: 4 });
+				expect(l_).toEqual({ VALIDATION: 0b1 << 0 });
+				expect(Object.keys(l_).length).toBe(1);
+			});
+
+			it('should collapse VALIDATION across three submodule tables', () => {
+				const l_json_msg_ = { VALIDATION: 1 };
+				const l_twoPhW_   = { LOG_EVENTS: 1, TIMEOUTS: 2, VALIDATION: 4, HANDLERS: 8 };
+				const l_subverse_ = { VALIDATION: 1 };
+				const l_ = l_union(l_json_msg_, l_twoPhW_, l_subverse_);
+				expect(l_).toEqual({
+					VALIDATION: 0b1 << 0, // 1 (first seen in json_msg)
+					LOG_EVENTS: 0b1 << 1, // 2
+					TIMEOUTS:   0b1 << 2, // 4
+					HANDLERS:   0b1 << 3  // 8
+				});
+			});
+
+			it('should let list order decide which labels keep the low bits', () => {
+				const l_pkg_ = { VALIDATION: 1, PARSE: 2 };
+				const l_app_ = { CONNECTIONS: 1, REFLECTION: 2 };
+				// app first -> app keeps bits 0,1; package pushed up
+				expect(l_union(l_app_, l_pkg_)).toEqual({
+					CONNECTIONS: 0b1 << 0,
+					REFLECTION:  0b1 << 1,
+					VALIDATION:  0b1 << 2,
+					PARSE:       0b1 << 3
+				});
+			});
+
+			it('should return a frozen object', () => {
+				const l_ = l_union({ A: 1 }, { B: 2 });
+				expect(Object.isFrozen(l_)).toBe(true);
+			});
+
+			it('should throw for a non-object arg', () => {
+				expect(() => l_union({ A: 1 }, 42)).toThrowError(Error, 'obj_labels must be an object');
+				expect(() => l_union(null)).toThrowError(Error, 'obj_labels must be an object');
+			});
+
+			it('should throw for an array arg (names go through l_array, not l_union)', () => {
+				expect(() => l_union(['A', 'B'])).toThrowError(Error, 'obj_labels must be an object');
+			});
+
+			it('should skip __proto__ and constructor keys', () => {
+				const l_ = l_union(JSON.parse('{ "__proto__": 1, "constructor": 2, "REAL": 4 }'));
+				expect(l_).toEqual({ REAL: 0b1 << 0 });
+			});
+
+			it('should handle exactly 31 unique labels without overflow', () => {
+				const arr_ = Array(31).fill().map((_, i) => `L${i}`);
+				const l_ = l_union(l_array(arr_));
+				expect(l_.L0).toBe(1);
+				expect(l_.L30).toBe(1 << 30);
+				expect(Object.keys(l_).length).toBe(31);
+			});
+
+			it('should throw at >31 unique labels', () => {
+				const arr_ = Array(32).fill().map((_, i) => `L${i}`);
+				expect(() => l_union(l_array(arr_))).toThrowError(Error, /exceed the 31-bit limit/);
+			});
 		});
 
 		describe('bit Label Limits;', () => {
@@ -1021,6 +1120,166 @@ describe("LOGR(root);", () => {
 			module_.logr_.lref= lref_module_orig;			
 		});
 
+	});
+
+	describe("wire;", () => {
+		let LOGR_;
+		let consoleSpy;
+
+		beforeEach(() => {
+			LOGR_ = LOGR.get_instance();
+			consoleSpy = spyOn(console, "log").and.callThrough();
+		});
+
+		afterEach(() => {
+			consoleSpy.calls.reset();
+		});
+
+		it("should point every submodule lref AND the main logr at ONE shared ref", () => {
+			const logrA = LOGR_.create({ labels: l_array(['A', 'B']) });
+			const logrB = LOGR_.create({ labels: l_array(['B', 'C']) }); // shares B
+			const logr_ = LOGR_.wire([logrA, logrB]);
+
+			// same LRef object shared by reference
+			expect(logrA.lref).toBe(logrB.lref);
+			expect(logrA.lref).toBe(logr_.lref);
+
+			expect(logr_.lref.get()).toEqual({
+				A: 0b1 << 0, // 1
+				B: 0b1 << 1, // 2
+				C: 0b1 << 2  // 4
+			});
+		});
+
+		it("should collapse a shared name to the same bit across all wired logrs", () => {
+			const logrA = LOGR_.create({ labels: l_array(['A', 'SHARED']) });
+			const logrB = LOGR_.create({ labels: l_array(['SHARED', 'C']) });
+			LOGR_.wire([logrA, logrB]);
+
+			expect(logrA.l.SHARED).toBe(logrB.l.SHARED);
+		});
+
+		it("should make a renumbered submodule log correctly after wiring (the key insight)", () => {
+			const handlerSpy = jasmine.createSpy('handler');
+			LOGR_.handler = handlerSpy;
+
+			// a "package" whose EVENTS sits at bit 0 in isolation
+			const logr_pkg = LOGR_.create({ labels: l_array(['EVENTS']) });
+			const l_pkg = logr_pkg.l; // captured BEFORE wiring, as a submodule does at load
+
+			// app labels come first, so EVENTS is renumbered upward by the union
+			const logr_app = LOGR_.create({ labels: l_array(['CONNECTIONS', 'REFLECTION']) });
+
+			const logr_ = LOGR_.wire([logr_app, logr_pkg]);
+			expect(logr_.lref.get()).toEqual({
+				CONNECTIONS: 0b1 << 0, // 1
+				REFLECTION:  0b1 << 1, // 2
+				EVENTS:      0b1 << 2  // 4 (was bit 0 for the package)
+			});
+
+			// toggle by NAME; the package's pre-captured proxy resolves EVENTS live -> 4
+			LOGR_.toggle(logr_.lref, { EVENTS: true });
+			logr_pkg.log(l_pkg.EVENTS, () => ['pkg EVENTS fired']);
+			expect(handlerSpy).toHaveBeenCalledWith('pkg EVENTS fired');
+
+			// and it does NOT fire on its OLD bit (bit 0, now CONNECTIONS)
+			handlerSpy.calls.reset();
+			LOGR_.toggle(logr_.lref, { CONNECTIONS: true });
+			logr_pkg.log(l_pkg.EVENTS, () => ['should not fire']);
+			expect(handlerSpy).not.toHaveBeenCalled();
+		});
+
+		it("should return a working main logr whose l resolves merged bits", () => {
+			const logrA = LOGR_.create({ labels: l_array(['A']) });
+			const logrB = LOGR_.create({ labels: l_array(['B']) });
+			const logr_ = LOGR_.wire([logrA, logrB]);
+			const l_ = logr_.l;
+
+			expect(l_.A).toBe(0b1 << 0);
+			expect(l_.B).toBe(0b1 << 1);
+
+			const handlerSpy = jasmine.createSpy('handler');
+			LOGR_.handler = handlerSpy;
+			LOGR_.toggle(l_, { B: true });
+			logr_.log(l_.B, () => ['wired B message']);
+			expect(handlerSpy).toHaveBeenCalledWith('wired B message');
+		});
+
+		it("should throw a clear indexed error when a submodule has no lref", () => {
+			const logrA = LOGR_.create({ labels: l_array(['A']) });
+			const logr_nolabels = LOGR_.create(); // lref === undefined
+			expect(() => LOGR_.wire([logrA, logr_nolabels]))
+				.toThrowError(Error, /logr at index 1 has no lref/);
+		});
+
+		it("should throw when the first argument is not an array", () => {
+			expect(() => LOGR_.wire(LOGR_.create({ labels: l_array(['A']) })))
+				.toThrowError(Error, /must be an array/);
+		});
+
+		it("optional pin: passes when layout matches", () => {
+			const logrA = LOGR_.create({ labels: l_array(['A', 'B']) });
+			const logr_ = LOGR_.wire([logrA], { A: 0b1 << 0, B: 0b1 << 1 });
+			expect(logr_.lref.get()).toEqual({ A: 0b1 << 0, B: 0b1 << 1 });
+		});
+
+		it("optional pin: throws when layout does not match", () => {
+			const logrA = LOGR_.create({ labels: l_array(['A', 'B']) });
+			expect(() => LOGR_.wire([logrA], { A: 0b1 << 1 }))
+				.toThrowError(Error, /do not match pinned positions/);
+		});
+
+		it("should leave every submodule lref untouched when a pin fails (atomicity)", () => {
+			const logrA = LOGR_.create({ labels: l_array(['A']) });
+			const logrB = LOGR_.create({ labels: l_array(['B']) });
+			const lref_A_orig = logrA.lref;
+			const lref_B_orig = logrB.lref;
+
+			// validation happens before the reassignment loop, so a throw must not mutate
+			expect(() => LOGR_.wire([logrA, logrB], { A: 0b1 << 5 }))
+				.toThrowError(Error, /do not match pinned positions/);
+
+			expect(logrA.lref).toBe(lref_A_orig);
+			expect(logrB.lref).toBe(lref_B_orig);
+		});
+
+		it("should return a usable logr with an empty table for an empty array", () => {
+			const logr_ = LOGR_.wire([]);
+			expect(logr_.lref.get()).toEqual({});
+			expect(logr_.l.get()).toEqual({});
+		});
+
+		describe("Production Mode (LOGR_ENABLED = false)", () => {
+			let logrA, logrB, lref_A_orig, lref_B_orig;
+
+			beforeEach(() => {
+				// create while enabled, capture original lrefs
+				logrA = LOGR_.create({ labels: l_array(['A']) });
+				logrB = LOGR_.create({ labels: l_array(['B']) });
+				lref_A_orig = logrA.lref;
+				lref_B_orig = logrB.lref;
+
+				Object.defineProperty(globalThis, 'LOGR_ENABLED', {
+					value: false, writable: true, configurable: true
+				});
+			});
+
+			afterEach(() => {
+				delete globalThis.LOGR_ENABLED;
+			});
+
+			it("should early-return a no-op stub without touching any submodule lref", () => {
+				const logr_ = LOGR_.wire([logrA, logrB]);
+
+				// stub: log/raw are no-ops, no lref
+				expect(typeof logr_.log).toBe('function');
+				expect(logr_.log(1, () => ['nope'])).toBe(undefined);
+
+				// submodule lrefs untouched
+				expect(logrA.lref).toBe(lref_A_orig);
+				expect(logrB.lref).toBe(lref_B_orig);
+			});
+		});
 	});
 
 	describe('Object.defineProperty(global, \'LOGR_ENABLED\', {});', () => {

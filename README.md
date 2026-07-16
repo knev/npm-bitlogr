@@ -100,11 +100,27 @@ const l_more_ = l_concat(l_, ['C', 'D']); // { A: 1, B: 2, C: 4, D: 8 }
 ```
 
 ### `l_merge(obj1, obj2)`
-Merges label sets, shifting conflicting values to unique bits.
+Merges two label sets, shifting conflicting values to unique bits. Same name with a **different**
+value throws.
 ```javascript
 const l1_ = { A: 1, B: 4 };
 const l2_ = { C: 1, D: 8 };
 const l_merged_ = l_merge(l1_, l2_); // { A: 1, B: 4, C: 16, D: 8 }
+```
+
+### `l_union(...objs)`
+Variadic merge **by name**. Collects the unique label names across all arguments in
+first-appearance order, **discards the incoming bit values**, and renumbers them contiguously from
+bit 0. Unlike `l_merge` it takes any number of sets, dedupes a shared name to one bit silently (no
+throw), and never needs `l_LL`/`l_RR` alignment. First-appearance order decides the bit position, so
+the first set keeps the low bits. Throws if the union would exceed 31 labels.
+```javascript
+const l_ = l_union(
+    { CONNECTIONS: 1, REFLECTION: 2 },
+    { VALIDATION: 1 },              // collides with CONNECTIONS by value, but is a distinct name
+    { VALIDATION: 4, HANDLERS: 8 }, // VALIDATION already seen -> deduped
+);
+// { CONNECTIONS: 1, REFLECTION: 2, VALIDATION: 4, HANDLERS: 8 }
 ```
 
 ### `l_LL(obj, shift)`
@@ -200,6 +216,64 @@ const logr_= LOGR_.create();
 logr_.lref= lref_;
 
 const l_= logr_.l;
+```
+
+This is the manual approach, and it still works — reach for it when you need the intermediate
+`l_merge`/`l_concat` steps (e.g. adding brand-new labels like `HANDLERS`/`DROPS` while merging).
+For the common case of "just share one table across submodules," `wire()` below does it in one call.
+
+### Reassigning Labels from Submodules — `wire()`
+
+`LOGR_.wire(arr_logr)` collapses the whole workflow into one call. It reads every submodule's
+labels, `l_union`s them into one shared table, points every submodule **and** a new main logr at
+that single `lref`, and returns the main logr. Because logging and `toggle` resolve labels **by
+name** (through the live `l` proxy), the union can renumber bits freely — no `l_merge` chains, no
+`l_LL`/`l_RR` alignment, no per-submodule reassignment to keep in sync.
+
+```javascript
+import { LOGR } from '@knev/bitlogr';
+import { ..., logr as logr_json_msg_ } from '@rootintf/json-msg'
+import { ..., logr as logr_twoPhW_ }   from '@rootintf/protocol-2phw'
+import { ..., logr as logr_discovery_ } from './Responder_Discovery.js'
+
+const logr_ = LOGR.get_instance().wire([
+    logr_json_msg_,
+    logr_twoPhW_,
+    logr_discovery_,
+]);
+
+const l_ = logr_.l;
+```
+
+The array is the single source of truth for which submodules participate — you cannot union a
+submodule and forget to reassign it. First-appearance order decides the bit layout (first logr keeps
+the low bits). A submodule created without labels (no `lref`) throws with its index. In production
+(`LOGR_ENABLED = false`), `wire` returns the same no-op stub as `create()`.
+
+**Optional position lock.** Pass an expected table as the second argument to pin the layout; `wire`
+runs `l_assert` on the union and throws on mismatch (otherwise omit it):
+
+```javascript
+const logr_ = LOGR.get_instance().wire(
+    [ logr_json_msg_, logr_twoPhW_, logr_discovery_ ],
+    { VALIDATION: 0b1 << 0, LOG_EVENTS: 0b1 << 1, /* ... */ } // optional
+);
+```
+
+You can always inspect the resulting table with `logr_.lref.get()`.
+
+**By hand.** `wire` is sugar over `l_union` + `lRef` + the `.lref` setter (it also adds the
+missing-`lref` guard, the optional pin, and the production short-circuit). The core is:
+
+```javascript
+const arr_logr_ = [ logr_json_msg_, logr_twoPhW_, logr_discovery_ ];
+
+const lref_ = lRef( l_union(...arr_logr_.map(g => g.lref.get())) );
+arr_logr_.forEach(g => g.lref = lref_);
+
+const logr_ = LOGR.get_instance().create(); // don't let create() make a new ref
+logr_.lref = lref_;
+const l_ = logr_.l;
 ```
 
 
