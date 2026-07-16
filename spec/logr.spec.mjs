@@ -1249,6 +1249,59 @@ describe("LOGR(root);", () => {
 			expect(logr_.l.get()).toEqual({});
 		});
 
+		it("should treat a bare leaf (no _arr_members) as one member and record members on the result", () => {
+			const logr_leaf = LOGR_.create({ labels: l_array(['A']) });
+			expect(logr_leaf._arr_members).toBeUndefined(); // a create() leaf carries none
+
+			const logr_ = LOGR_.wire([logr_leaf]);
+			expect(logr_._arr_members).toContain(logr_leaf); // the leaf ...
+			expect(logr_._arr_members).toContain(logr_);     // ... and the main it produced
+		});
+
+		it("should compose across nesting levels: a sub-unit's hidden leaf follows a parent wire (transitive)", () => {
+			const handlerSpy = jasmine.createSpy('handler');
+			LOGR_.handler = handlerSpy;
+
+			// mirrors the app: net_DiscoverySvc (leaf) -> orchestrator bridge -> orchestrator -> main
+			const logr_1s = LOGR_.create({ labels: l_array(['VALIDATION']) });
+			const logr_ds = LOGR_.create({ labels: l_array(['DISCOVERY']) });
+			const l_ds = logr_ds.l; // captured at "load", before any wiring
+
+			const logr_orchbridge = LOGR_.wire([logr_1s]);                     // level 1
+			const logr_orch       = LOGR_.wire([logr_orchbridge, logr_ds]);    // level 2 (wraps the bridge)
+			const logr_mainbridge = LOGR_.create({ labels: l_array(['CONNECTIONS', 'REFLECTION']) });
+			const logr_main       = LOGR_.wire([logr_mainbridge, logr_orch]);  // level 3 (wraps the orchestrator)
+
+			// the deepest leaves rode all the way up onto main's single shared ref
+			expect(logr_ds.lref).toBe(logr_main.lref);
+			expect(logr_1s.lref).toBe(logr_main.lref);
+
+			// and net_DiscoverySvc fires by NAME against the top table's DISCOVERY bit
+			LOGR_.toggle(logr_main.lref, { DISCOVERY: true });
+			logr_ds.log(l_ds.DISCOVERY, () => ['net_DiscoverySvc fired']);
+			expect(handlerSpy).toHaveBeenCalledWith('net_DiscoverySvc fired');
+		});
+
+		it("pin is per-level: a mid-level pin asserts a transient layout the parent renumbers away", () => {
+			// mid level: DISCOVERY is bit 0 in the sub-union, so the mid pin PASSES (no throw)
+			const logr_ds  = LOGR_.create({ labels: l_array(['DISCOVERY']) });
+			const logr_mid = LOGR_.wire([logr_ds], { DISCOVERY: 0b1 << 0 });
+			expect(logr_mid.lref.get()).toEqual({ DISCOVERY: 0b1 << 0 });
+
+			// parent: its own labels come first, so DISCOVERY is renumbered upward (bit 0 -> bit 2)
+			const logr_other = LOGR_.create({ labels: l_array(['CONNECTIONS', 'REFLECTION']) });
+			const logr_top   = LOGR_.wire([logr_other, logr_mid]);
+			expect(logr_top.lref.get().DISCOVERY).toBe(0b1 << 2); // the FINAL table
+			expect(logr_mid.lref.get().DISCOVERY).toBe(0b1 << 2); // the mid unit follows; its pin did not survive
+
+			// so the mid-level positions no longer describe the final table: they FAIL as a top-level pin
+			const logr_ds2  = LOGR_.create({ labels: l_array(['DISCOVERY']) });
+			const logr_mid2 = LOGR_.wire([logr_ds2]);
+			const logr_oth2 = LOGR_.create({ labels: l_array(['CONNECTIONS', 'REFLECTION']) });
+			expect(() => LOGR_.wire([logr_oth2, logr_mid2], { DISCOVERY: 0b1 << 0 }))
+				.toThrowError(Error, /do not match pinned positions/);
+		});
+
 		describe("Production Mode (LOGR_ENABLED = false)", () => {
 			let logrA, logrB, lref_A_orig, lref_B_orig;
 

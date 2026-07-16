@@ -262,6 +262,36 @@ const logr_ = LOGR.get_instance().wire(
 
 You can always inspect the resulting table with `logr_.lref.get()`.
 
+**Pins are per-level.** In a nested build each `wire` renumbers from scratch (`l_union`,
+first-appearance order), so a parent `wire` overwrites whatever positions a child pinned. A
+mid-level pin still runs and throws at *its* level, but it asserts a **transient** layout the parent
+renumbers away — only the **top-level** pin describes the final table you actually `toggle`/log
+against. Put the pin on the outermost `wire`.
+
+**Nesting composes.** A wired main remembers its members (every logr sharing its `lref`), so
+passing one unit's wired `logr` into a parent `wire()` re-points that unit's hidden leaves too —
+transitively, at any depth. Each unit just `wire()`s its own submodules and exports its `logr`; a
+parent `wire()`s the child's `logr` without ever naming the child's internals. This is what lets a
+process build one shared label space bottom-up while keeping each unit encapsulated:
+
+```javascript
+// unit A (e.g. a sub-bridge) — wires its own leaves, exports its main logr
+export const logr = LOGR.get_instance().wire([ logr_leaf_a_, logr_leaf_b_ ]);
+
+// unit B (the orchestrator) — wires unit A's main + its own leaf; A's leaves follow
+export const logr = LOGR.get_instance().wire([ logr_unitA_, logr_net_ ]);
+
+// entry — wires unit B + its own bridge; EVERY leaf below lands on this one table
+const logr_ = LOGR.get_instance().wire([ logr_mainbridge_, logr_unitB_ ]);
+LOGR.get_instance().toggle(logr_.lref.get(), { DISCOVERY: true });
+```
+
+> **Caveat — foreign packages built the old way.** A third-party package that internally used the
+> old manual `l_merge` + hand-reassignment (rather than `wire`) and exports a *main* logr won't carry
+> a member list, so its sub-leaves aren't exposed — nesting it can orphan them. That's no worse than
+> before, and any package built on `wire` composes perfectly. Packages that export plain *leaf* logrs
+> (from `create()`) are unaffected — they wire as a single member and follow reassignment normally.
+
 **By hand.** `wire` is sugar over `l_union` + `lRef` + the `.lref` setter (it also adds the
 missing-`lref` guard, the optional pin, and the production short-circuit). The core is:
 
