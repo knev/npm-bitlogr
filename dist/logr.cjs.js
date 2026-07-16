@@ -110,6 +110,26 @@ function l_merge_(obj_labels1, obj_labels2) {
     }
     return Object.freeze(result);
 }
+function l_union_(...objs_labels) {
+    const k_LABELS_MAX = 31; // bits 0..30 usable; bit 31 is the sign bit in 32-bit ops
+    const arr_key = [];
+    for (const obj_labels of objs_labels) {
+        // reject arrays too: an array of names is l_array_'s job, not a label table
+        if (!obj_labels || typeof obj_labels !== 'object' || Array.isArray(obj_labels))
+            throw new Error('obj_labels must be an object');
+        // only the names matter; incoming bit values are discarded and renumbered.
+        // filtering the proto keys here means the plain-object result of l_array_ is safe.
+        for (const key of Object.keys(obj_labels)) {
+            if (key === '__proto__' || key === 'constructor')
+                continue;
+            if (!arr_key.includes(key))
+                arr_key.push(key); // first-appearance order fixes the bit position
+        }
+    }
+    if (arr_key.length > k_LABELS_MAX)
+        throw new Error(`l_union: ${arr_key.length} labels exceed the ${k_LABELS_MAX}-bit limit`);
+    return l_array_(arr_key); // { name: 1 << index }, frozen
+}
 function l_LL_(obj, x) {
     if (!obj || typeof obj !== 'object')
         throw new Error('obj must be an object');
@@ -363,6 +383,44 @@ const LOGR = (function () {
                 };
                 return _logger;
             },
+            // Union every submodule's labels into one shared table, point every
+            // submodule AND a new main logr at it, and return the main logr.
+            // Driven off the single arr_logr array so union-inputs and reassign-
+            // targets can't drift. Optional obj_pin locks the resulting positions.
+            //
+            // A wired main remembers its members (_arr_members: every logr sharing
+            // its lref). wire() EXPANDS each passed logr to its members -- a bare
+            // leaf is just itself -- so a nested wire() re-points a sub-unit's hidden
+            // leaves through its exported main WITHOUT the caller naming them. That
+            // is what lets wire() compose instead of orphaning the inner leaves.
+            wire(arr_logr, obj_pin) {
+                // production short-circuit: the disabled stub has no lref, so bail
+                // before touching any (This constant is replaced at build time.)
+                if (!(globalThis.LOGR_ENABLED ?? true))
+                    return this.create();
+                if (!Array.isArray(arr_logr))
+                    throw new Error('wire: first argument must be an array of logr objects');
+                // validate each passed logr, then expand it to its members
+                const set_members = new Set();
+                arr_logr.forEach((logr_, i) => {
+                    if (!logr_ || typeof logr_.lref?.get !== 'function')
+                        throw new Error(`wire: logr at index ${i} has no lref (created without labels?)`);
+                    for (const member of (logr_._arr_members ?? [logr_]))
+                        set_members.add(member);
+                });
+                const arr_members = [...set_members];
+                const obj_labels_ = l_union_(...arr_members.map((m) => m.lref.get()));
+                if (obj_pin !== undefined && !l_assert_(obj_labels_, obj_pin))
+                    throw new Error('wire: unioned labels do not match pinned positions\n'
+                        + JSON.stringify(obj_labels_, null, 2));
+                const lref_ = lRef(obj_labels_);
+                for (const member of arr_members)
+                    member.lref = lref_; // re-point every member (leaves included) at the shared ref
+                const logr_ = this.create(); // no labels -> _lref_labels undefined
+                logr_.lref = lref_; // main logr on the same shared ref
+                logr_._arr_members = [...arr_members, logr_]; // remember, so a parent wire() can follow
+                return logr_;
+            },
         };
     }
     // Public interface
@@ -394,3 +452,4 @@ exports.l_assert = l_assert_;
 exports.l_concat = l_concat_;
 exports.l_length = l_length_;
 exports.l_merge = l_merge_;
+exports.l_union = l_union_;
