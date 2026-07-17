@@ -364,6 +364,43 @@ Don't use labels, just log.
 logr_.raw('const l_ ', l_.get())
 ```
 
+### Call-site tracing (`LOGR_.trace`) — the JS `__FUNC__`
+
+Instead of hand-typing a `'Orchestrator: '` prefix on every line, turn on tracing and each **fired**
+log gets its caller's `Class.method` appended, in parens, after the message:
+
+```javascript
+LOGR.get_instance().trace = true;   // off by default
+
+// inside a class method:
+logr_.log(l_.DISCOVERY, () => ['curated-list query: id=', id]);
+// → prints:  curated-list query: id= ... (Orchestrator._on_curated_query)
+```
+
+`trace = true` appends the site as `(site)`. Pass a function instead to format it yourself
+(it's still appended after the message — you control the text):
+
+```javascript
+LOGR.get_instance().trace = (site) => `[${site}]`;
+// → prints:  curated-list query: id= ... [Orchestrator._on_curated_query]
+```
+
+How it works and what to expect:
+
+- It reads V8's **structured** stack (`Error.captureStackTrace` + a `prepareStackTrace` hook), so it
+  gets `Class.method` directly — no string parsing. A method call yields `Orchestrator._on_curated_query`;
+  a plain/object-literal function yields its name (`do_curated_query`); a truly anonymous frame falls
+  back to the file name.
+- **Only the name is used — not `file:line`.** After bundling, the line number is bundle-relative
+  junk (`main.bundle.dev.js:78755`), and source maps aren't applied to the programmatic stack, so it's
+  dropped. Function/class **names** do survive `tsc` + unminified (dev) bundling.
+- **Cost is paid only on logs that actually fire** (the stack read happens after the toggle check),
+  and only in dev — in production `LOGR_ENABLED=false` strips the whole path. So a checked-but-skipped
+  log pays nothing.
+- **V8-only** (Node / Electron / Chromium). On other engines `trace` degrades to no prefix rather
+  than breaking. A minified build would mangle the names (`t.e`), but tracing is a dev aid and prod is
+  disabled, so names are intact where it runs.
+
 ### spec/logr.spec.mjs
 See `spec/logr.spec.mjs` in the source for more examples.
  

@@ -222,6 +222,49 @@ function handler_default_( /* ... */ ) {
 	console.log.apply(console, args);
 }
 
+// Best-effort "where did this log happen" tag, the JS analogue of C++ __FUNC__.
+// Uses V8's structured stack (Error.captureStackTrace + a prepareStackTrace hook) to read the
+// caller's Class.method WITHOUT string-parsing. fn_sentinel cuts the internal frames deterministically.
+// Names survive tsc + unminified (dev) bundling; the file:line does NOT (it is bundle-relative), so
+// only the name is used. Returns '' on non-V8 engines or if the frame can't be named.
+function _trace_site_(fn_sentinel) {
+	const _cap = (Error as any).captureStackTrace;
+	if (typeof _cap !== 'function')
+		return ''; // non-V8: no structured stack available
+
+	const _prep = (Error as any).prepareStackTrace;
+	try {
+		(Error as any).prepareStackTrace = (_err, stack) => stack; // hand back raw CallSite[]
+		const holder: any = {};
+		_cap(holder, fn_sentinel); // omit fn_sentinel and every frame above it
+		const stack = holder.stack;
+		if (! stack || ! stack.length)
+			return '';
+
+		// stack[0] is the logger's own log() frame unless the JIT inlined it -- skip it if present
+		let idx = 0;
+		if (stack[0].getFunctionName && stack[0].getFunctionName() === 'log')
+			idx = 1;
+		const frame = stack[idx];
+		if (! frame)
+			return '';
+
+		const type = frame.getTypeName ? frame.getTypeName() : null;
+		const fn = frame.getFunctionName ? frame.getFunctionName() : null;
+		if (fn && type && type !== 'Object')
+			return type + '.' + fn; // e.g. Orchestrator._on_curated_query
+		if (fn)
+			return fn;             // plain function / object-literal method
+		return frame.getFileName ? frame.getFileName() : '';
+	}
+	catch (e) {
+		return '';
+	}
+	finally {
+		(Error as any).prepareStackTrace = _prep;
+	}
+}
+
 //-------------------------------------------------------------------------------------------------
 
 type LabelsRecord = Record<string, number>;
@@ -387,6 +430,7 @@ const LOGR = (function () {
 		// Private state (replacing constructor properties)
 		let _Bint_toggled: bigint = BigInt(0);
 		let _handler_log = handler_default_;
+		let _trace: any = false; // false | true | (site: string) => string
 
 		function _log_fxn(nr_logged, argsFn /* args */) {
 			// console.log('_log_fxn: ', BigInt(nr_logged), _Bint_toggled, (BigInt(nr_logged) & _Bint_toggled));
@@ -394,6 +438,17 @@ const LOGR = (function () {
 				return;
 
 			const args = argsFn();
+
+			// trace only pays the stack cost on logs that actually FIRE, and only in dev
+			if (_trace) {
+				const site = _trace_site_(_log_fxn);
+				if (site) {
+					const tag = (typeof _trace === 'function') ? _trace(site) : `(${site})`;
+					_handler_log.apply(this, [...args, tag]); // append the call site AFTER the message
+					return;
+				}
+			}
+
 			_handler_log.apply(this, args);
 		}
 
@@ -403,6 +458,14 @@ const LOGR = (function () {
 			get handler() { return _handler_log; },
 			set handler(fx) {
 				_handler_log = fx;
+			},
+
+			// Append each FIRED log with its call site (Class.method), the JS analogue of __FUNC__.
+			// false (default) = off; true = append the site as "(site)"; a function = format it, e.g.
+			// LOGR_.trace = (site) => `[${site}]`. Only costs a stack read on logs that fire (dev only).
+			get trace() { return _trace; },
+			set trace(v) {
+				_trace = v;
 			},
 
 			get toggled() : bigint { return _Bint_toggled; },

@@ -1335,6 +1335,71 @@ describe("LOGR(root);", () => {
 		});
 	});
 
+	describe("trace;", () => {
+		let LOGR_;
+		let handlerSpy;
+
+		beforeEach(() => {
+			LOGR_ = LOGR.get_instance();
+			handlerSpy = jasmine.createSpy('handler');
+			LOGR_.handler = handlerSpy;
+		});
+
+		afterEach(() => {
+			LOGR_.trace = false; // reset the global flag for other specs
+		});
+
+		it("is off by default -- no call-site prefix", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+			logr_.log(l_.A, () => ['msg']);
+			expect(handlerSpy).toHaveBeenCalledWith('msg'); // bare, no prefix
+		});
+
+		it("appends the caller's function name in parens after the message when on", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+			LOGR_.trace = true;
+
+			function my_named_site_() {
+				logr_.log(l_.A, () => ['msg']);
+			}
+			my_named_site_();
+
+			const args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('msg');                        // the message comes first
+			expect(args[args.length - 1]).toBe('(my_named_site_)'); // call site, appended in parens
+		});
+
+		it("accepts a formatter function (appended)", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+			LOGR_.trace = (site) => `[${site}]`;
+
+			function site_fmt_() {
+				logr_.log(l_.A, () => ['msg']);
+			}
+			site_fmt_();
+
+			const args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('msg');
+			expect(args[args.length - 1]).toBe('[site_fmt_]');
+		});
+
+		it("does not prefix (or fire) a log whose label is off", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['A', 'B']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true }); // B stays off
+			LOGR_.trace = true;
+
+			logr_.log(l_.B, () => ['nope']);
+			expect(handlerSpy).not.toHaveBeenCalled();
+		});
+	});
+
 	describe('Object.defineProperty(global, \'LOGR_ENABLED\', {});', () => {
 		let LOGR_;
 		let logr_;
