@@ -385,6 +385,22 @@ LOGR.get_instance().trace = (site) => `[${site}]`;
 // → prints:  curated-list query: id= ... [Orchestrator._on_curated_query]
 ```
 
+#### `LOGR_.prefix("...")` — the cheap, static counterpart
+
+`trace` walks the stack (~5–6 µs per fired log). If you just want a **fixed** tag for a unit and
+don't need the per-method resolution, use `prefix` — it prepends a constant string with no stack cost:
+
+```javascript
+LOGR.get_instance().prefix('Orchestrator:');   // prepend a fixed tag to every fired log
+logr_.log(l_.DISCOVERY, () => ['curated-list query: id=', id]);
+// → prints:  Orchestrator: curated-list query: id= ...
+
+LOGR.get_instance().prefix();                  // prefix() / prefix('') turns it off
+```
+
+`trace` and `prefix` are **mutually exclusive** — enabling one disables the other. (Both are on the
+`LOGR_` singleton, so they apply process-wide; flip them on around a debugging session.)
+
 How it works and what to expect:
 
 - It reads V8's **structured** stack (`Error.captureStackTrace` + a `prepareStackTrace` hook), so it

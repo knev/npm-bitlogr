@@ -430,7 +430,8 @@ const LOGR = (function () {
 		// Private state (replacing constructor properties)
 		let _Bint_toggled: bigint = BigInt(0);
 		let _handler_log = handler_default_;
-		let _trace: any = false; // false | true | (site: string) => string
+		let _trace: any = false;                // false | true | (site: string) => string
+		let _str_prefix: string | null = null;  // fixed prefix string, or null = off
 
 		function _log_fxn(nr_logged, argsFn /* args */) {
 			// console.log('_log_fxn: ', BigInt(nr_logged), _Bint_toggled, (BigInt(nr_logged) & _Bint_toggled));
@@ -439,14 +440,19 @@ const LOGR = (function () {
 
 			const args = argsFn();
 
-			// trace only pays the stack cost on logs that actually FIRE, and only in dev
+			// trace (call-site) and prefix (fixed string) are mutually exclusive tags, dev-only.
+			// trace pays a stack read on FIRED logs only; prefix is free.
 			if (_trace) {
 				const site = _trace_site_(_log_fxn);
 				if (site) {
 					const tag = (typeof _trace === 'function') ? _trace(site) : `(${site})`;
-					_handler_log.apply(this, [...args, tag]); // append the call site AFTER the message
+					_handler_log.apply(this, [...args, tag]); // call site APPENDED after the message
 					return;
 				}
+			}
+			else if (_str_prefix) {
+				_handler_log.apply(this, [_str_prefix, ...args]); // fixed string PREPENDED before the message
+				return;
 			}
 
 			_handler_log.apply(this, args);
@@ -463,9 +469,19 @@ const LOGR = (function () {
 			// Append each FIRED log with its call site (Class.method), the JS analogue of __FUNC__.
 			// false (default) = off; true = append the site as "(site)"; a function = format it, e.g.
 			// LOGR_.trace = (site) => `[${site}]`. Only costs a stack read on logs that fire (dev only).
+			// Mutually exclusive with prefix() -- enabling trace disables any prefix.
 			get trace() { return _trace; },
 			set trace(v) {
 				_trace = v;
+				if (v) _str_prefix = null; // trace and prefix are mutually exclusive
+			},
+
+			// Prepend every FIRED log with a fixed string -- the cheap, static counterpart to trace
+			// (no stack walk). Mutually exclusive with trace: enabling one disables the other.
+			// prefix('Orchestrator:') to enable; prefix() or prefix('') to disable.
+			prefix(str) {
+				_str_prefix = (typeof str === 'string' && str.length) ? str : null;
+				if (_str_prefix) _trace = false;
 			},
 
 			get toggled() : bigint { return _Bint_toggled; },

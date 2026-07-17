@@ -1346,7 +1346,8 @@ describe("LOGR(root);", () => {
 		});
 
 		afterEach(() => {
-			LOGR_.trace = false; // reset the global flag for other specs
+			LOGR_.trace = false; // reset the global flags for other specs
+			LOGR_.prefix();
 		});
 
 		it("is off by default -- no call-site prefix", () => {
@@ -1397,6 +1398,51 @@ describe("LOGR(root);", () => {
 
 			logr_.log(l_.B, () => ['nope']);
 			expect(handlerSpy).not.toHaveBeenCalled();
+		});
+
+		it("prefix() prepends a fixed string to fired logs", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+			LOGR_.prefix('Orchestrator:');
+
+			logr_.log(l_.A, () => ['msg']);
+			const args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('Orchestrator:'); // prepended
+			expect(args[1]).toBe('msg');
+		});
+
+		it("prefix() with no/empty arg disables it", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+			LOGR_.prefix('X:');
+			LOGR_.prefix(); // disable
+
+			logr_.log(l_.A, () => ['msg']);
+			expect(handlerSpy).toHaveBeenCalledWith('msg'); // bare again
+		});
+
+		it("trace and prefix are mutually exclusive", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+
+			// prefix set, then trace on -> prefix is cleared, trace wins
+			LOGR_.prefix('P:');
+			LOGR_.trace = true;
+			function site_a_() { logr_.log(l_.A, () => ['m']); }
+			site_a_();
+			let args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('m');                       // no prefix
+			expect(args[args.length - 1]).toBe('(site_a_)'); // trace tag appended
+
+			// prefix() again -> trace is cleared, prefix wins
+			LOGR_.prefix('P:');
+			logr_.log(l_.A, () => ['m2']);
+			args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('P:');                      // prefix prepended
+			expect(args[args.length - 1]).toBe('m2');        // no trace tag
 		});
 	});
 
