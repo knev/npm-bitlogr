@@ -306,6 +306,46 @@ logr_.lref = lref_;
 const l_ = logr_.l;
 ```
 
+### Adding a unit's own tag
+
+When a unit `wire`s submodules but also wants a label of **its own** (one that no submodule
+contributes), add it as another leaf in the wire array — a small logr that carries just what this
+unit introduces:
+
+```javascript
+import { LOGR, l_array } from '@knev/bitlogr';
+
+const LOGR_ = LOGR.get_instance();
+
+// this unit's OWN tag(s) -- a leaf carrying just what it adds
+const logr_self_ = LOGR_.create({ labels: l_array(['ORCH']) });
+
+const logr_ = LOGR_.wire([
+    logr_self_,   // <- your new tag joins the shared union
+    logr_me_,
+    logr_ds_,
+]);
+
+const l_ = logr_.l;
+export { logr_ as logr };
+
+// log through the wired main, resolved by name:
+logr_.log(l_.ORCH, () => ['orchestrator: ...']);
+```
+
+You don't log through `logr_self_` — it's just the label carrier; you always log through `logr_` /
+`l_`. Because `logr_self_` is a member of `logr_`, the tag **composes upward**: a parent `wire`
+pulls it in via the member chain, so it lands on the final table and is toggleable from the top.
+
+If you'd rather not introduce a carrier logr for a single tag, append it to the shared ref in place
+(everyone on that ref sees it, since it's mutated, not replaced):
+
+```javascript
+logr_.lref.set( l_concat(logr_.lref.get(), l_array(['ORCH'])) );
+```
+
+Both propagate to a parent `wire`. The leaf-in-`wire` form is the cleaner idiom — every set of
+labels is a logr; reach for the `l_concat` one only when adding a tag after the fact.
 
 ### Custom Handler
 
