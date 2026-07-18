@@ -3,6 +3,10 @@
 const __name = obj => Object.keys(obj)[0];
 // console.log('OUT', __name({variableName}) );
 
+// The single-shared-space label ceiling: bits 0..30 are usable, bit 31 is the sign bit in JS
+// 32-bit bitwise ops. One authoritative representation of the limit (OAOO).
+const k_LABELS_MAX_ = 31;
+
 //-------------------------------------------------------------------------------------------------
 
 function l_length_(obj_labels) {
@@ -130,7 +134,6 @@ function l_merge_(obj_labels1, obj_labels2) {
 }
 
 function l_union_(...objs_labels) {
-    const k_LABELS_MAX = 31; // bits 0..30 usable; bit 31 is the sign bit in 32-bit ops
     const arr_key = [];
     for (const obj_labels of objs_labels) {
         // reject arrays too: an array of names is l_array_'s job, not a label table
@@ -145,8 +148,8 @@ function l_union_(...objs_labels) {
                 arr_key.push(key); // first-appearance order fixes the bit position
         }
     }
-    if (arr_key.length > k_LABELS_MAX)
-        throw new Error(`l_union: ${arr_key.length} labels exceed the ${k_LABELS_MAX}-bit limit`);
+    if (arr_key.length > k_LABELS_MAX_)
+        throw new Error(`l_union: ${arr_key.length} labels exceed the ${k_LABELS_MAX_}-bit limit`);
     return l_array_(arr_key); // { name: 1 << index }, frozen
 }
 
@@ -224,9 +227,18 @@ function handler_default_( /* ... */ ) {
 
 // Best-effort "where did this log happen" tag, the JS analogue of C++ __FUNC__.
 // Uses V8's structured stack (Error.captureStackTrace + a prepareStackTrace hook) to read the
-// caller's Class.method WITHOUT string-parsing. fn_sentinel cuts the internal frames deterministically.
-// Names survive tsc + unminified (dev) bundling; the file:line does NOT (it is bundle-relative), so
-// only the name is used. Returns '' on non-V8 engines or if the frame can't be named.
+// caller's Class.method WITHOUT string-parsing. fn_sentinel is the STABLE internal _log_fxn (not the
+// replaceable public log method): captureStackTrace cuts it and every frame above it, so:
+//   - normal case: stack[0] is the log() wrapper (named _logr_log_), stack[1] is the user's call site;
+//   - if the JIT INLINES the wrapper, there is no wrapper frame and stack[0] IS the user.
+// So we skip stack[0] ONLY when it's the wrapper, identified by its distinctive internal name
+// _logr_log_ -- which handles inlining (no skip when absent) AND is immune to a user method named
+// 'log' (its name isn't _logr_log_). Names survive tsc + unminified (dev) bundling; the file:line
+// does NOT (bundle-relative), so only the name is used. Returns '' on non-V8 / unnamed frames.
+//
+// NOTE: swapping Error.prepareStackTrace is a process-global mutation. It is safe only because this
+// runs fully synchronously (no await) on JS's single thread and is restored in finally -- do not make
+// the log path async without revisiting this.
 function _trace_site_(fn_sentinel) {
 	const _cap = (Error as any).captureStackTrace;
 	if (typeof _cap !== 'function')
@@ -236,14 +248,15 @@ function _trace_site_(fn_sentinel) {
 	try {
 		(Error as any).prepareStackTrace = (_err, stack) => stack; // hand back raw CallSite[]
 		const holder: any = {};
-		_cap(holder, fn_sentinel); // omit fn_sentinel and every frame above it
+		_cap(holder, fn_sentinel); // omit fn_sentinel (_log_fxn) and every frame above it
 		const stack = holder.stack;
 		if (! stack || ! stack.length)
 			return '';
 
-		// stack[0] is the logger's own log() frame unless the JIT inlined it -- skip it if present
+		// skip the internal log() wrapper frame when present (not inlined), identified by its
+		// distinctive name; if inlined, stack[0] is already the user's frame.
 		let idx = 0;
-		if (stack[0].getFunctionName && stack[0].getFunctionName() === 'log')
+		if (stack[0].getFunctionName && stack[0].getFunctionName() === '_logr_log_')
 			idx = 1;
 		const frame = stack[idx];
 		if (! frame)
@@ -280,7 +293,10 @@ function _matched_names_(lref, nr_logged, bigint_toggled) {
 	if (bigint_matched === BigInt(0))
 		return names;
 
-	for (const k in obj_labels) {
+	// Assumes the normal one-bit-per-name table (what l_array_/l_union_ produce). A hand-built
+	// table where two names share a bit will report both here -- intended, but worth knowing.
+	// Object.keys (own-enumerable) not for..in, to match the codebase's proto-key hygiene.
+	for (const k of Object.keys(obj_labels)) {
 		const v = obj_labels[k];
 		if ((typeof v === 'number' || typeof v === 'bigint') && (BigInt(v) & bigint_matched) !== BigInt(0))
 			names.push(k);
@@ -450,12 +466,14 @@ const LOGR = (function () {
 		if ( (globalThis as any).LOGR_ENABLED ?? true)
 			console.log('creating LOGR instance:', _id);
 
-		// Private state (replacing constructor properties)
+		// Private state (replacing constructor properties). _trace / _str_prefix / _labeled are
+		// written ONLY by their accessors below, which keep trace and prefix mutually exclusive --
+		// so _log_fxn can rely on that invariant without re-checking it.
 		let _Bint_toggled: bigint = BigInt(0);
 		let _handler_log = handler_default_;
-		let _trace: any = false;                // false | true | (site: string) => string
+		let _trace: boolean | ((site: string) => string) = false;
 		let _str_prefix: string | null = null;  // fixed prefix string, or null = off
-		let _labeled: any = false;              // false | true | (names: string[]) => string
+		let _labeled: boolean | ((names: string[]) => string) = false;
 
 		function _log_fxn(nr_logged, argsFn /* args */) {
 			// console.log('_log_fxn: ', BigInt(nr_logged), _Bint_toggled, (BigInt(nr_logged) & _Bint_toggled));
@@ -482,7 +500,7 @@ const LOGR = (function () {
 
 			let tail = args;
 			if (_trace) {
-				const site = _trace_site_(_log_fxn);
+				const site = _trace_site_(_log_fxn); // stable internal sentinel (not the public log)
 				if (site) {
 					const tag = (typeof _trace === 'function') ? _trace(site) : `(${site})`;
 					tail = [...args, tag]; // call site APPENDED after the message
@@ -576,7 +594,10 @@ const LOGR = (function () {
 						this._lref_labels = lref_labels_new;
 					},
 
-					log(nr_logged, argsFn) {
+					// named _logr_log_ (a distinctive internal name, not the collision-prone 'log') so
+					// _trace_site_ can identify this wrapper frame without mistaking a user method
+					// that happens to be named 'log'. Public property is still 'log'.
+					log: function _logr_log_(nr_logged, argsFn) {
 						// This constant will be replaced at build time
             			if (!((globalThis as any).LOGR_ENABLED ?? true))
 							return;
@@ -629,12 +650,15 @@ const LOGR = (function () {
 						+ JSON.stringify(obj_labels_, null, 2));
 
 				const lref_ = lRef(obj_labels_);
-				for (const member of arr_members)
-					member.lref = lref_; // re-point every member (leaves included) at the shared ref
 
+				// Build the main logr FIRST -- create() is the last fallible step; do it before
+				// mutating any member .lref, so a throw can't leave members half-repointed.
 				const logr_ = this.create(); // no labels -> _lref_labels undefined
 				logr_.lref = lref_;          // main logr on the same shared ref
 				(logr_ as any)._arr_members = [...arr_members, logr_]; // remember, so a parent wire() can follow
+
+				for (const member of arr_members)
+					member.lref = lref_; // re-point every member (leaves included) at the shared ref -- MUTATION LAST
 				return logr_;
 			},
 

@@ -1468,6 +1468,23 @@ describe("LOGR(root);", () => {
 			expect(handlerSpy).toHaveBeenCalledWith('msg'); // bare
 		});
 
+		it("labeled ignores inherited (proto) keys on the label table", () => {
+			// INHERITED shares A's bit, so for..in WOULD report it; Object.keys must not
+			const proto = { INHERITED: 0b1 << 0 };
+			const own = Object.create(proto);
+			own.A = 0b1 << 0;
+
+			const logr_ = LOGR_.create({ labels: own });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+			LOGR_.labeled = true;
+
+			logr_.log(l_.A, () => ['msg']);
+			const args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('[A]'); // only the own key, not the inherited one
+			expect(args[1]).toBe('msg');
+		});
+
 		it("labeled accepts a formatter that abbreviates the fired names", () => {
 			const logr_ = LOGR_.create({ labels: l_array(['DISCOVERY', 'CURATED_LISTS']) });
 			const l_ = logr_.l;
@@ -1491,6 +1508,68 @@ describe("LOGR(root);", () => {
 			logr_.log(l_.A, () => ['msg']);
 			expect(received).toEqual(['A']);                // array of fired names
 			expect(handlerSpy).toHaveBeenCalledWith('msg'); // empty string -> no tag
+		});
+
+		it("labeled composes with trace -- label first, message, trace last", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['DISCOVERY']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { DISCOVERY: true });
+			LOGR_.labeled = true;
+			LOGR_.trace = true;
+
+			function site_lt_() { logr_.log(l_.DISCOVERY, () => ['msg']); }
+			site_lt_();
+			const args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('[DISCOVERY]');              // label first
+			expect(args[1]).toBe('msg');                      // then the message
+			expect(args[args.length - 1]).toBe('(site_lt_)'); // trace appended last
+		});
+
+		it("labeled resolves names through a wired main's shared lref (no own labels)", () => {
+			const logrA = LOGR_.create({ labels: l_array(['DISCOVERY']) });
+			const logrB = LOGR_.create({ labels: l_array(['VALIDATION']) });
+			const logr_ = LOGR_.wire([logrA, logrB]); // the main carries no own labels
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { DISCOVERY: true });
+			LOGR_.labeled = true;
+
+			logr_.log(l_.DISCOVERY, () => ['msg']);
+			const args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('[DISCOVERY]');
+			expect(args[1]).toBe('msg');
+		});
+
+		it("trace is not fooled by a caller method also named 'log'", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+			LOGR_.trace = true;
+
+			class Widget {
+				log() { logr_.log(l_.A, () => ['msg']); }
+			}
+			new Widget().log();
+
+			// the user's Widget.log() is attributed, not skipped as if it were the logger's wrapper
+			expect(handlerSpy.calls.mostRecent().args.pop()).toBe('(Widget.log)');
+		});
+
+		it("trace survives logr_.log being replaced (keys on the internal sentinel, not the public log)", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+			LOGR_.trace = true;
+
+			// user decorates the public log; the original still routes through _log_fxn
+			const log_orig = logr_.log;
+			logr_.log = function log_wrapper_(nr, fn) { return log_orig.call(logr_, nr, fn); };
+
+			logr_.log(l_.A, () => ['msg']);
+
+			// trace still emits a real call-site tag (not '' / not an internal frame): the sentinel
+			// is _log_fxn, so swapping .log cannot break attribution. Here the caller of the original
+			// log is the wrapper, so that is the reported site.
+			expect(handlerSpy.calls.mostRecent().args.pop()).toBe('(log_wrapper_)');
 		});
 
 		it("trace and prefix are mutually exclusive", () => {
