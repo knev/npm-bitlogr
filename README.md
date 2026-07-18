@@ -364,6 +364,25 @@ Don't use labels, just log.
 logr_.raw('const l_ ', l_.get())
 ```
 
+### Warnings & errors (`warn` / `error`) — the always-on severity channel
+
+Labels are the *opt-in debug* axis: a `log(l_.X, …)` only fires if `X` is toggled. A **warning** is a
+different axis — it must surface **regardless** of what's toggled (you don't want a warning silently
+swallowed because nobody enabled its label). So `warn` / `error` are an always-on channel *beside* the
+label system, with their own handlers (default `console.warn` / `console.error`):
+
+```javascript
+logr_.warn('discovery svc unreachable:', host);  // always prints, ungated by toggle
+logr_.error('rpc failed:', err.message);
+
+LOGR_.handler_warn  = (...a) => console.warn('WARN:', ...a);   // overridable, like handler
+LOGR_.handler_error = (...a) => console.error('ERR:', ...a);
+```
+
+They are **not** gated by `toggle`, and unlike `log` they are **not** stripped in production
+(`LOGR_ENABLED = false`) — a warning should still fire in a shipped build. Keep them for genuine
+severity; use labelled `log()` for debug tracing.
+
 ### Call-site tracing (`LOGR_.trace`) — the JS `__FUNC__`
 
 Instead of hand-typing a `'Orchestrator: '` prefix on every line, turn on tracing and each **fired**

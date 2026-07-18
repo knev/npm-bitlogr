@@ -1595,6 +1595,70 @@ describe("LOGR(root);", () => {
 		});
 	});
 
+	describe("warn / error (severity channel);", () => {
+		let LOGR_;
+		let orig_warn;
+		let orig_error;
+
+		beforeEach(() => {
+			LOGR_ = LOGR.get_instance();
+			orig_warn = LOGR_.handler_warn;   // capture defaults so specs restore them
+			orig_error = LOGR_.handler_error;
+		});
+
+		afterEach(() => {
+			LOGR_.handler_warn = orig_warn;
+			LOGR_.handler_error = orig_error;
+		});
+
+		it("warn fires through handler_warn, ungated by the toggle mask", () => {
+			const warnSpy = jasmine.createSpy('warn');
+			LOGR_.handler_warn = warnSpy;
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+			LOGR_.toggle(logr_.l, {}); // nothing toggled on
+
+			logr_.warn('heads up', 42);
+			expect(warnSpy).toHaveBeenCalledWith('heads up', 42);
+		});
+
+		it("error fires through handler_error, ungated", () => {
+			const errSpy = jasmine.createSpy('error');
+			LOGR_.handler_error = errSpy;
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+
+			logr_.error('boom');
+			expect(errSpy).toHaveBeenCalledWith('boom');
+		});
+
+		it("defaults route to console.warn / console.error", () => {
+			const warnSpy = spyOn(console, 'warn');
+			const errSpy = spyOn(console, 'error');
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+
+			logr_.warn('w');
+			logr_.error('e');
+			expect(warnSpy).toHaveBeenCalledWith('w');
+			expect(errSpy).toHaveBeenCalledWith('e');
+		});
+
+		it("warn/error still fire when LOGR_ENABLED is false (severity is not stripped)", () => {
+			const warnSpy = jasmine.createSpy('warn');
+			LOGR_.handler_warn = warnSpy;
+
+			Object.defineProperty(globalThis, 'LOGR_ENABLED', {
+				value: false, writable: true, configurable: true
+			});
+			try {
+				const logr_ = LOGR_.create({ labels: l_array(['A']) }); // the disabled stub
+				logr_.warn('still here');
+				expect(warnSpy).toHaveBeenCalledWith('still here');
+			}
+			finally {
+				delete globalThis.LOGR_ENABLED;
+			}
+		});
+	});
+
 	describe('Object.defineProperty(global, \'LOGR_ENABLED\', {});', () => {
 		let LOGR_;
 		let logr_;

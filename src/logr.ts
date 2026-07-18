@@ -225,6 +225,15 @@ function handler_default_( /* ... */ ) {
 	console.log.apply(console, args);
 }
 
+// Defaults for the always-on severity channel (warn/error). Separate from the label/toggle system
+// on purpose: a warning must surface regardless of what is toggled.
+function handler_warn_( /* ... */ ) {
+	console.warn.apply(console, Array.prototype.slice.call(arguments));
+}
+function handler_error_( /* ... */ ) {
+	console.error.apply(console, Array.prototype.slice.call(arguments));
+}
+
 // Best-effort "where did this log happen" tag, the JS analogue of C++ __FUNC__.
 // Uses V8's structured stack (Error.captureStackTrace + a prepareStackTrace hook) to read the
 // caller's Class.method WITHOUT string-parsing. fn_sentinel is the STABLE internal _log_fxn (not the
@@ -471,6 +480,8 @@ const LOGR = (function () {
 		// so _log_fxn can rely on that invariant without re-checking it.
 		let _Bint_toggled: bigint = BigInt(0);
 		let _handler_log = handler_default_;
+		let _handler_warn = handler_warn_;   // always-on severity channel, independent of _Bint_toggled
+		let _handler_error = handler_error_;
 		let _trace: boolean | ((site: string) => string) = false;
 		let _str_prefix: string | null = null;  // fixed prefix string, or null = off
 		let _labeled: boolean | ((names: string[]) => string) = false;
@@ -519,6 +530,17 @@ const LOGR = (function () {
 			get handler() { return _handler_log; },
 			set handler(fx) {
 				_handler_log = fx;
+			},
+
+			// Handlers for the always-on severity channel (logr_.warn / logr_.error), default
+			// console.warn / console.error. Overridable like handler.
+			get handler_warn() { return _handler_warn; },
+			set handler_warn(fx) {
+				_handler_warn = fx;
+			},
+			get handler_error() { return _handler_error; },
+			set handler_error(fx) {
+				_handler_error = fx;
 			},
 
 			// Append each FIRED log with its call site (Class.method), the JS analogue of __FUNC__.
@@ -573,6 +595,9 @@ const LOGR = (function () {
 						_obj_labels: undefined,  // optional: keep shape compatible if needed
 						log: () => {},     // does nothing
 						raw: () => {},     // does nothing
+						// severity is NOT stripped in production -- warnings/errors must still surface
+						warn(...args) { _handler_warn.apply(this, args); },
+						error(...args) { _handler_error.apply(this, args); },
 					};
 				}
 
@@ -608,7 +633,16 @@ const LOGR = (function () {
 					// Optional shorthand for common cases
                     raw(...args) {
                         _handler_log.apply(this, args);
-                    }
+                    },
+
+					// Always-on severity channel: fires regardless of the toggle mask (a warning must
+					// not be silenceable by forgetting to toggle a label). Orthogonal to the label system.
+					warn(...args) {
+						_handler_warn.apply(this, args);
+					},
+					error(...args) {
+						_handler_error.apply(this, args);
+					}
 				}
 
 				return _logger;
