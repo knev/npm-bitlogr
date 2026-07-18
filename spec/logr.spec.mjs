@@ -1348,6 +1348,7 @@ describe("LOGR(root);", () => {
 		afterEach(() => {
 			LOGR_.trace = false; // reset the global flags for other specs
 			LOGR_.prefix();
+			LOGR_.labeled = false;
 		});
 
 		it("is off by default -- no call-site prefix", () => {
@@ -1421,6 +1422,75 @@ describe("LOGR(root);", () => {
 
 			logr_.log(l_.A, () => ['msg']);
 			expect(handlerSpy).toHaveBeenCalledWith('msg'); // bare again
+		});
+
+		it("labeled prepends only the fired label name", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['DISCOVERY', 'CURATED_LISTS']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { DISCOVERY: true }); // CURATED_LISTS stays off
+			LOGR_.labeled = true;
+
+			logr_.log(l_.DISCOVERY | l_.CURATED_LISTS, () => ['msg']);
+			const args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('[DISCOVERY]'); // only the label that fired
+			expect(args[1]).toBe('msg');
+		});
+
+		it("labeled joins multiple fired labels", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['DISCOVERY', 'CURATED_LISTS']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { DISCOVERY: true, CURATED_LISTS: true });
+			LOGR_.labeled = true;
+
+			logr_.log(l_.DISCOVERY | l_.CURATED_LISTS, () => ['msg']);
+			expect(handlerSpy.calls.mostRecent().args[0]).toBe('[DISCOVERY|CURATED_LISTS]');
+		});
+
+		it("labeled combines with prefix -- label before prefix", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['DISCOVERY']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { DISCOVERY: true });
+			LOGR_.labeled = true;
+			LOGR_.prefix('Orchestrator:');
+
+			logr_.log(l_.DISCOVERY, () => ['msg']);
+			const args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('[DISCOVERY]');   // label first
+			expect(args[1]).toBe('Orchestrator:'); // then prefix
+			expect(args[2]).toBe('msg');
+		});
+
+		it("labeled is off by default", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+			logr_.log(l_.A, () => ['msg']);
+			expect(handlerSpy).toHaveBeenCalledWith('msg'); // bare
+		});
+
+		it("labeled accepts a formatter that abbreviates the fired names", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['DISCOVERY', 'CURATED_LISTS']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { DISCOVERY: true, CURATED_LISTS: true });
+			const ABBR = { DISCOVERY: 'DISC', CURATED_LISTS: 'CURL' };
+			LOGR_.labeled = (names) => `[${names.map(n => ABBR[n] ?? n).join('|')}]`;
+
+			logr_.log(l_.DISCOVERY | l_.CURATED_LISTS, () => ['msg']);
+			const args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('[DISC|CURL]');
+			expect(args[1]).toBe('msg');
+		});
+
+		it("labeled formatter receives the names as an array; '' suppresses the tag", () => {
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+			let received;
+			LOGR_.labeled = (names) => { received = names; return ''; };
+
+			logr_.log(l_.A, () => ['msg']);
+			expect(received).toEqual(['A']);                // array of fired names
+			expect(handlerSpy).toHaveBeenCalledWith('msg'); // empty string -> no tag
 		});
 
 		it("trace and prefix are mutually exclusive", () => {

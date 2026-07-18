@@ -401,6 +401,41 @@ LOGR.get_instance().prefix();                  // prefix() / prefix('') turns it
 `trace` and `prefix` are **mutually exclusive** — enabling one disables the other. (Both are on the
 `LOGR_` singleton, so they apply process-wide; flip them on around a debugging session.)
 
+#### `LOGR_.labeled` — which label fired
+
+Prepend each fired log with the label name(s) that actually triggered it — the bits present in
+**both** the statement and the toggled mask:
+
+```javascript
+LOGR.get_instance().labeled = true;
+logr_.log(l_.DISCOVERY | l_.CURATED_LISTS, () => ['query...']);
+// with only DISCOVERY toggled on -> prints:  [DISCOVERY] query...
+// with both on                    -> prints:  [DISCOVERY|CURATED_LISTS] query...
+```
+
+`labeled` is **independent** of `trace`/`prefix` and composes with them — the label goes first, then
+the prefix, then the message, then any trace tag:
+
+```javascript
+LOGR.get_instance().labeled = true;
+LOGR.get_instance().prefix('Orchestrator:');
+// → prints:  [DISCOVERY] Orchestrator: query...
+```
+
+Pass a **function** to own the tag — abbreviate, re-order, bracket, or return `''` to suppress. It
+receives the fired names as an **array** (so you can map each), and controls the whole tag (like the
+`trace` formatter). Unmapped names fall through to their full name:
+
+```javascript
+const ABBR = { DISCOVERY: 'DISC', CURATED_LISTS: 'CURL', REFLECTION: 'REFL' };
+LOGR.get_instance().labeled = (names) => `[${names.map(n => ABBR[n] ?? n).join('|')}]`;
+// → prints:  [DISC] query...   /   [DISC|CURL] query...
+```
+
+There is no auto-abbreviation in the library (2-letter codes collide and, once collision-resolved,
+become unstable as the label set grows) — the formatter hands that policy to you, so uniqueness and
+stability stay in your control.
+
 How it works and what to expect:
 
 - It reads V8's **structured** stack (`Error.captureStackTrace` + a `prepareStackTrace` hook), so it

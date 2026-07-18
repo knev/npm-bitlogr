@@ -265,6 +265,29 @@ function _trace_site_(fn_sentinel) {
 	}
 }
 
+// The label name(s) that actually FIRED this log, as an ARRAY: the bits present in BOTH the
+// statement's nr_logged and the toggled mask, resolved back to names via the logr's own label
+// table. e.g. log(l_.DISCOVERY | l_.CURATED_LISTS, ...) with only DISCOVERY toggled -> ['DISCOVERY'].
+function _matched_names_(lref, nr_logged, bigint_toggled) {
+	const names = [];
+	if (! lref || typeof lref.get !== 'function')
+		return names;
+	const obj_labels = lref.get();
+	if (! obj_labels)
+		return names;
+
+	const bigint_matched = BigInt(nr_logged) & bigint_toggled;
+	if (bigint_matched === BigInt(0))
+		return names;
+
+	for (const k in obj_labels) {
+		const v = obj_labels[k];
+		if ((typeof v === 'number' || typeof v === 'bigint') && (BigInt(v) & bigint_matched) !== BigInt(0))
+			names.push(k);
+	}
+	return names;
+}
+
 //-------------------------------------------------------------------------------------------------
 
 type LabelsRecord = Record<string, number>;
@@ -432,6 +455,7 @@ const LOGR = (function () {
 		let _handler_log = handler_default_;
 		let _trace: any = false;                // false | true | (site: string) => string
 		let _str_prefix: string | null = null;  // fixed prefix string, or null = off
+		let _labeled: any = false;              // false | true | (names: string[]) => string
 
 		function _log_fxn(nr_logged, argsFn /* args */) {
 			// console.log('_log_fxn: ', BigInt(nr_logged), _Bint_toggled, (BigInt(nr_logged) & _Bint_toggled));
@@ -440,22 +464,35 @@ const LOGR = (function () {
 
 			const args = argsFn();
 
-			// trace (call-site) and prefix (fixed string) are mutually exclusive tags, dev-only.
-			// trace pays a stack read on FIRED logs only; prefix is free.
+			// output shape:  [label?] [prefix?] ...message [trace?]
+			// label (which label fired) and trace/prefix are independent; trace and prefix are
+			// mutually exclusive. All dev-only; trace pays a stack read on FIRED logs only.
+			const lead = [];
+			if (_labeled) {
+				const names = _matched_names_(this._lref_labels, nr_logged, _Bint_toggled);
+				if (names.length) {
+					// true -> "[DISCOVERY]"; a function -> your policy over the names array
+					const tag = (typeof _labeled === 'function') ? _labeled(names) : '[' + names.join('|') + ']';
+					if (tag)
+						lead.push(tag); // BEFORE the prefix
+				}
+			}
+			if (_str_prefix)
+				lead.push(_str_prefix);
+
+			let tail = args;
 			if (_trace) {
 				const site = _trace_site_(_log_fxn);
 				if (site) {
 					const tag = (typeof _trace === 'function') ? _trace(site) : `(${site})`;
-					_handler_log.apply(this, [...args, tag]); // call site APPENDED after the message
-					return;
+					tail = [...args, tag]; // call site APPENDED after the message
 				}
 			}
-			else if (_str_prefix) {
-				_handler_log.apply(this, [_str_prefix, ...args]); // fixed string PREPENDED before the message
-				return;
-			}
 
-			_handler_log.apply(this, args);
+			if (lead.length)
+				_handler_log.apply(this, [...lead, ...tail]);
+			else
+				_handler_log.apply(this, tail);
 		}
 
 		return {
@@ -482,6 +519,16 @@ const LOGR = (function () {
 			prefix(str) {
 				_str_prefix = (typeof str === 'string' && str.length) ? str : null;
 				if (_str_prefix) _trace = false;
+			},
+
+			// Prepend each FIRED log with the label name(s) that fired it (the bits present in
+			// BOTH the statement and the toggled mask). false = off; true = "[NAME|NAME]"; a
+			// function (names: string[]) => string owns the whole tag (abbreviate, re-order,
+			// bracket, or return '' to suppress). Independent of trace/prefix -- when combined,
+			// the label goes first, before the prefix.
+			get labeled() { return _labeled; },
+			set labeled(v) {
+				_labeled = v;
 			},
 
 			get toggled() : bigint { return _Bint_toggled; },
