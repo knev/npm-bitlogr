@@ -1449,6 +1449,25 @@ describe("LOGR(root);", () => {
 			expect(handlerSpy).toHaveBeenCalledWith('unit_a:', 'a again');
 		});
 
+		it("mute supports hierarchical 'app:*' wildcard names", () => {
+			const logr_r = LOGR_.create({ name: 'app:reflector', labels: l_array(['A']) });
+			const logr_d = LOGR_.create({ name: 'app:db', labels: l_array(['A']) });
+			const logr_o = LOGR_.create({ name: 'other:x', labels: l_array(['A']) });
+			LOGR_.toggle(logr_r.l, { A: true });
+
+			LOGR_.mute('app:*'); // prefix match over the hierarchy
+			logr_r.log(logr_r.l.A, () => ['r']);
+			logr_d.log(logr_d.l.A, () => ['d']);
+			expect(handlerSpy).not.toHaveBeenCalled(); // both app:* are muted
+
+			logr_o.log(logr_o.l.A, () => ['o']);
+			expect(handlerSpy).toHaveBeenCalledWith('other:x:', 'o'); // outside app: -> fires
+
+			LOGR_.mute('app:*', false); // clear the wildcard
+			logr_r.log(logr_r.l.A, () => ['r2']);
+			expect(handlerSpy).toHaveBeenCalledWith('app:reflector:', 'r2');
+		});
+
 		it("mute reaches a unit by name without holding its logr (through wire)", () => {
 			const logr_leaf = LOGR_.create({ name: 'leaf', labels: l_array(['A']) });
 			const logr_other = LOGR_.create({ labels: l_array(['B']) });

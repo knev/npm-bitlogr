@@ -313,6 +313,20 @@ function _matched_names_(lref, nr_logged, bigint_toggled) {
 	return names;
 }
 
+// Is a unit's name matched by any entry in a mute/verbose set? An entry is either an exact name or
+// a trailing-'*' prefix pattern -- so hierarchical names ('app:reflector', 'app:db') can be scoped
+// with mute('app:*'), and mute('*') matches everything. Exact names keep the O(1) Set fast path.
+function _name_matched_(name, set_entries) {
+	if (! name || set_entries.size === 0)
+		return false;
+	if (set_entries.has(name))
+		return true; // exact
+	for (const entry of set_entries)
+		if (entry.endsWith('*') && name.startsWith(entry.slice(0, -1)))
+			return true;
+	return false;
+}
+
 //-------------------------------------------------------------------------------------------------
 
 type LabelsRecord = Record<string, number>;
@@ -488,12 +502,12 @@ const LOGR = (function () {
 		const _verbose_names = new Set<string>();  // named units forced fully verbose (fire regardless of toggle)
 
 		function _log_fxn(nr_logged, argsFn /* args */) {
-			// per-unit scope (by this logr's name): a muted unit is silent; a forced-verbose unit
-			// fires regardless of the toggle mask.
-			if (this._name && _muted_names.has(this._name))
+			// per-unit scope (by this logr's name, exact or 'app:*' wildcard): a muted unit is
+			// silent; a forced-verbose unit fires regardless of the toggle mask.
+			if (_name_matched_(this._name, _muted_names))
 				return;
 			const matched = (BigInt(nr_logged) & _Bint_toggled) !== BigInt(0);
-			if (! matched && ! (this._name && _verbose_names.has(this._name)))
+			if (! matched && ! _name_matched_(this._name, _verbose_names))
 				return;
 
 			const args = argsFn();
@@ -571,6 +585,7 @@ const LOGR = (function () {
 			//   verbose -- force a unit to fire ALL its logs regardless of the label mask (scoped to it).
 			// Each takes one name, several, or an array, plus an optional trailing on/off (default true):
 			//   mute('a'), mute('a','b'), mute(['a','b']), mute('a', false) to un-mute.
+			// A name may be a trailing-'*' wildcard over hierarchical names: mute('app:*'), mute('*').
 			mute(...args: (string | string[] | boolean)[]): void {
 				const on = (typeof args[args.length - 1] === 'boolean') ? args.pop() as boolean : true;
 				for (const n of (args as (string | string[])[]).flat())

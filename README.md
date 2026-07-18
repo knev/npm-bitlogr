@@ -444,6 +444,19 @@ Two per-unit axes, both keyed by the unit's `name`:
 Each takes one name, several names, or an array, plus an optional trailing `true|false` to turn it
 off/on (default `true`): `mute('a')`, `mute('a', 'b')`, `mute(['a', 'b'])`, `mute('a', false)`.
 
+**Hierarchical names + wildcards.** Name units hierarchically (`app:reflector`, `app:db`) and scope a
+whole subtree with a trailing `*`:
+
+```javascript
+LOGR_.mute('app:*');   // mute every unit whose name starts with "app:"
+LOGR_.mute('*');       // mute all named units
+LOGR_.mute('app:*', false);   // clear it
+```
+
+Exact names keep the O(1) fast path; wildcards are checked per fired log against the named units.
+(There's no negation — to un-mute one unit under a `*`, clear the wildcard and re-mute the rest, or
+mute the specific names instead.)
+
 `verbose` is per-unit — it does *not* enable a shared label everywhere (that's just `toggle(labels,
 {…})`). `warn`/`error` ignore `mute`; severity always surfaces.
 
