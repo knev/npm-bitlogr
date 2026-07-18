@@ -501,6 +501,19 @@ const LOGR = (function () {
 		const _muted_names = new Set<string>();    // named units silenced (log suppressed)
 		const _verbose_names = new Set<string>();  // named units forced fully verbose (fire regardless of toggle)
 
+		// Append the call site "(site)" to args when trace is on -- the ONLY decoration shared by
+		// log/warn/error. fn_sentinel is the stable internal function on the calling path so
+		// _trace_site_ cuts to the user's frame. (name/label are log-only, handled in _log_fxn.)
+		function _trace_wrap_(args, fn_sentinel) {
+			if (! _trace)
+				return args;
+			const site = _trace_site_(fn_sentinel);
+			if (! site)
+				return args;
+			const tag = (typeof _trace === 'function') ? _trace(site) : `(${site})`;
+			return [...args, tag]; // call site APPENDED after the message
+		}
+
 		function _log_fxn(nr_logged, argsFn /* args */) {
 			// per-unit scope (by this logr's name, exact or 'app:*' wildcard): a muted unit is
 			// silent; a forced-verbose unit fires regardless of the toggle mask.
@@ -528,14 +541,8 @@ const LOGR = (function () {
 			if (this._name)
 				lead.push(this._name + ':'); // the ':' is implicit -- the name itself doesn't carry it
 
-			let tail = args;
-			if (_trace) {
-				const site = _trace_site_(_log_fxn); // stable internal sentinel (not the public log)
-				if (site) {
-					const tag = (typeof _trace === 'function') ? _trace(site) : `(${site})`;
-					tail = [...args, tag]; // call site APPENDED after the message
-				}
-			}
+			// trace (the call-site tag) is the one bit shared with warn/error -> one impl in _trace_wrap_
+			const tail = _trace_wrap_(args, _log_fxn);
 
 			if (lead.length)
 				_handler_log.apply(this, [...lead, ...tail]);
@@ -665,11 +672,13 @@ const LOGR = (function () {
 
 					// Always-on severity channel: fires regardless of the toggle mask (a warning must
 					// not be silenceable by forgetting to toggle a label). Orthogonal to the label system.
-					warn(...args) {
-						_handler_warn.apply(this, args);
+					// Named function expressions so each can pass ITSELF as the trace sentinel, giving
+					// warn/error the same call-site tag as log when trace is on.
+					warn: function _logr_warn_(...args) {
+						_handler_warn.apply(this, _trace_wrap_(args, _logr_warn_));
 					},
-					error(...args) {
-						_handler_error.apply(this, args);
+					error: function _logr_error_(...args) {
+						_handler_error.apply(this, _trace_wrap_(args, _logr_error_));
 					}
 				}
 

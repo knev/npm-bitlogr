@@ -1674,6 +1674,37 @@ describe("LOGR(root);", () => {
 		afterEach(() => {
 			LOGR_.handler_warn = orig_warn;
 			LOGR_.handler_error = orig_error;
+			LOGR_.trace = false;
+		});
+
+		it("warn/error append the call site when trace is on", () => {
+			const warnSpy = jasmine.createSpy('warn');
+			const errSpy = jasmine.createSpy('error');
+			LOGR_.handler_warn = warnSpy;
+			LOGR_.handler_error = errSpy;
+			LOGR_.trace = true;
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+
+			function warn_site_() { logr_.warn('heads up'); }
+			warn_site_();
+			let args = warnSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('heads up');                    // message unchanged (no name)
+			expect(args[args.length - 1]).toBe('(warn_site_)');  // call site appended
+
+			function err_site_() { logr_.error('boom'); }
+			err_site_();
+			args = errSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('boom');
+			expect(args[args.length - 1]).toBe('(err_site_)');
+		});
+
+		it("warn is bare when trace is off (no call-site tag)", () => {
+			const warnSpy = jasmine.createSpy('warn');
+			LOGR_.handler_warn = warnSpy;
+			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+
+			logr_.warn('hi', 1);
+			expect(warnSpy).toHaveBeenCalledWith('hi', 1);
 		});
 
 		it("warn fires through handler_warn, ungated by the toggle mask", () => {
