@@ -454,6 +454,7 @@ function create_Referenced_l_<T extends LabelsRecord>(ref: { get: () => T }) {
 }
 
 type LogrOptions = {
+	name?: string;   // the unit's identity: display prefix + mute/toggle-by-name handle
 	labels?: LabelsRecord;
 	// arr_labels? : Array<string>;
 	log_handler?: ((...args: any[]) => void);
@@ -475,27 +476,31 @@ const LOGR = (function () {
 		if ( (globalThis as any).LOGR_ENABLED ?? true)
 			console.log('creating LOGR instance:', _id);
 
-		// Private state (replacing constructor properties). _trace / _str_prefix / _labeled are
-		// written ONLY by their accessors below, which keep trace and prefix mutually exclusive --
-		// so _log_fxn can rely on that invariant without re-checking it.
+		// Private state (replacing constructor properties).
 		let _Bint_toggled: bigint = BigInt(0);
 		let _handler_log = handler_default_;
 		let _handler_warn = handler_warn_;   // always-on severity channel, independent of _Bint_toggled
 		let _handler_error = handler_error_;
 		let _trace: boolean | ((site: string) => string) = false;
-		let _str_prefix: string | null = null;  // fixed prefix string, or null = off
 		let _labeled: boolean | ((names: string[]) => string) = false;
+		// per-unit scope, keyed by each logr's own name (create({ name })):
+		const _muted_names = new Set<string>();    // named units silenced (log suppressed)
+		const _verbose_names = new Set<string>();  // named units forced fully verbose (fire regardless of toggle)
 
 		function _log_fxn(nr_logged, argsFn /* args */) {
-			// console.log('_log_fxn: ', BigInt(nr_logged), _Bint_toggled, (BigInt(nr_logged) & _Bint_toggled));
-			if ((BigInt(nr_logged) & _Bint_toggled) === BigInt(0))
+			// per-unit scope (by this logr's name): a muted unit is silent; a forced-verbose unit
+			// fires regardless of the toggle mask.
+			if (this._name && _muted_names.has(this._name))
+				return;
+			const matched = (BigInt(nr_logged) & _Bint_toggled) !== BigInt(0);
+			if (! matched && ! (this._name && _verbose_names.has(this._name)))
 				return;
 
 			const args = argsFn();
 
-			// output shape:  [label?] [prefix?] ...message [trace?]
-			// label (which label fired) and trace/prefix are independent; trace and prefix are
-			// mutually exclusive. All dev-only; trace pays a stack read on FIRED logs only.
+			// output shape:  [label?] name: ...message [trace?]
+			// label (which label fired) and the unit name are prepended; trace is appended.
+			// All dev-only; trace pays a stack read on FIRED logs only.
 			const lead = [];
 			if (_labeled) {
 				const names = _matched_names_(this._lref_labels, nr_logged, _Bint_toggled);
@@ -503,11 +508,11 @@ const LOGR = (function () {
 					// true -> "[DISCOVERY]"; a function -> your policy over the names array
 					const tag = (typeof _labeled === 'function') ? _labeled(names) : '[' + names.join('|') + ']';
 					if (tag)
-						lead.push(tag); // BEFORE the prefix
+						lead.push(tag); // BEFORE the name
 				}
 			}
-			if (_str_prefix)
-				lead.push(_str_prefix);
+			if (this._name)
+				lead.push(this._name + ':'); // the ':' is implicit -- the name itself doesn't carry it
 
 			let tail = args;
 			if (_trace) {
@@ -546,41 +551,45 @@ const LOGR = (function () {
 			// Append each FIRED log with its call site (Class.method), the JS analogue of __FUNC__.
 			// false (default) = off; true = append the site as "(site)"; a function = format it, e.g.
 			// LOGR_.trace = (site) => `[${site}]`. Only costs a stack read on logs that fire (dev only).
-			// Mutually exclusive with prefix() -- enabling trace disables any prefix.
 			get trace() { return _trace; },
 			set trace(v) {
 				_trace = v;
-				if (v) _str_prefix = null; // trace and prefix are mutually exclusive
-			},
-
-			// Prepend every FIRED log with a fixed string -- the cheap, static counterpart to trace
-			// (no stack walk). Mutually exclusive with trace: enabling one disables the other.
-			// prefix('Orchestrator:') to enable; prefix() or prefix('') to disable.
-			prefix(str) {
-				_str_prefix = (typeof str === 'string' && str.length) ? str : null;
-				if (_str_prefix) _trace = false;
 			},
 
 			// Prepend each FIRED log with the label name(s) that fired it (the bits present in
 			// BOTH the statement and the toggled mask). false = off; true = "[NAME|NAME]"; a
 			// function (names: string[]) => string owns the whole tag (abbreviate, re-order,
-			// bracket, or return '' to suppress). Independent of trace/prefix -- when combined,
-			// the label goes first, before the prefix.
+			// bracket, or return '' to suppress). Independent of trace/name -- the label goes first.
 			get labeled() { return _labeled; },
 			set labeled(v) {
 				_labeled = v;
 			},
 
+			// Per-unit scope, addressed by a logr's own name (create({ name })) -- so it reaches a
+			// unit buried under wire() without holding its logr. Two axes, both keyed by name:
+			//   mute    -- silence a unit's log output (warn/error exempt);
+			//   verbose -- force a unit to fire ALL its logs regardless of the label mask (scoped to it).
+			// Each takes one name, several, or an array, plus an optional trailing on/off (default true):
+			//   mute('a'), mute('a','b'), mute(['a','b']), mute('a', false) to un-mute.
+			mute(...args: (string | string[] | boolean)[]): void {
+				const on = (typeof args[args.length - 1] === 'boolean') ? args.pop() as boolean : true;
+				for (const n of (args as (string | string[])[]).flat())
+					if (on) _muted_names.add(n); else _muted_names.delete(n);
+			},
+			verbose(...args: (string | string[] | boolean)[]): void {
+				const on = (typeof args[args.length - 1] === 'boolean') ? args.pop() as boolean : true;
+				for (const n of (args as (string | string[])[]).flat())
+					if (on) _verbose_names.add(n); else _verbose_names.delete(n);
+			},
+
 			get toggled() : bigint { return _Bint_toggled; },
-			// toggle(obj_labels, obj_toggled) {
-			// 	_Bint_toggled= l_toBigInt_(obj_labels, obj_toggled);
-			// },
+
+			// toggle the global label mask (which categories fire). For per-unit control use
+			// mute/verbose above -- not this.
 			toggle(labels: LRef<LabelsRecord> | LabelsRecord, obj_toggled: Record<string, boolean>): void {
 				const obj_labels = typeof labels?.get === 'function'
 					? (labels as LRef<LabelsRecord>).get()
 					: labels as LabelsRecord;
-
-				// console.log('obj_labels', obj_labels)
 
 				_Bint_toggled = l_toBigInt_(obj_labels, obj_toggled);
 			},
@@ -602,12 +611,16 @@ const LOGR = (function () {
 				}
 
 				const _logger = {
+					// the unit's name (create({ name })): its display prefix AND its mute/toggle identity.
+					_name: options.name,
+					get name() { return this._name; },
+
 					// _lref_labels: (options.arr_labels === undefined) ? undefined : lRef( l_array_(options.arr_labels) ),
-					_lref_labels: (options.labels === undefined) 
-						? undefined 
+					_lref_labels: (options.labels === undefined)
+						? undefined
 						: lRef( options.labels ) as undefined | LRef<LabelsRecord>,
 
-					get l() { 
+					get l() {
 						// Always create a fresh proxy pointing to the current labels
 						return create_Referenced_l_({
 							get: () => this._lref_labels?.get() || {}

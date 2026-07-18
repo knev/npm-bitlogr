@@ -404,21 +404,48 @@ LOGR.get_instance().trace = (site) => `[${site}]`;
 // → prints:  curated-list query: id= ... [Orchestrator._on_curated_query]
 ```
 
-#### `LOGR_.prefix("...")` — the cheap, static counterpart
+#### Unit `name` — identity, prefix, and scope
 
-`trace` walks the stack (~5–6 µs per fired log). If you just want a **fixed** tag for a unit and
-don't need the per-method resolution, use `prefix` — it prepends a constant string with no stack cost:
+Give a unit a **name** at `create` (before `labels`). The name is both its **display prefix** (printed
+with an implicit `:`, so the name itself doesn't carry one) and its **filter identity** for muting:
 
 ```javascript
-LOGR.get_instance().prefix('Orchestrator:');   // prepend a fixed tag to every fired log
+const logr_ = LOGR_.create({ name: 'Orchestrator', labels: l_array(['DISCOVERY']) });
 logr_.log(l_.DISCOVERY, () => ['curated-list query: id=', id]);
 // → prints:  Orchestrator: curated-list query: id= ...
 
-LOGR.get_instance().prefix();                  // prefix() / prefix('') turns it off
+logr_.name;   // 'Orchestrator'  (no colon)
 ```
 
-`trace` and `prefix` are **mutually exclusive** — enabling one disables the other. (Both are on the
-`LOGR_` singleton, so they apply process-wide; flip them on around a debugging session.)
+Unlike `trace`, the name costs nothing (no stack walk), and unlike the old global prefix it's
+**per-unit** — each unit names itself. It composes with `trace` (name prepended, call site appended):
+`Orchestrator: … (Orchestrator._on_curated_query)`.
+
+#### Scoping by unit — `mute` / `verbose`
+
+Because the name lives on the logr and is checked at log time, you can scope output **by name**
+without holding a buried unit's logr — which matters under `wire`, where a parent doesn't have its
+sub-units' loggers:
+
+```javascript
+LOGR_.toggle(l_, { REFLECTOR: true });    // REFLECTOR on everywhere
+LOGR_.mute('net_DiscoverySvc');           // ...but hush that one unit (by name)
+LOGR_.mute('net_DiscoverySvc', false);    // restore it
+
+LOGR_.verbose('net_DiscoverySvc');        // force ONE unit fully verbose: all its logs fire
+LOGR_.verbose('net_DiscoverySvc', false); // regardless of the label mask -> back to label-gated
+```
+
+Two per-unit axes, both keyed by the unit's `name`:
+- **`mute`** — silence a unit (regardless of what's toggled).
+- **`verbose`** — force a unit to fire **all** its logs, ignoring the label mask, **scoped to that
+  unit only**.
+
+Each takes one name, several names, or an array, plus an optional trailing `true|false` to turn it
+off/on (default `true`): `mute('a')`, `mute('a', 'b')`, `mute(['a', 'b'])`, `mute('a', false)`.
+
+`verbose` is per-unit — it does *not* enable a shared label everywhere (that's just `toggle(labels,
+{…})`). `warn`/`error` ignore `mute`; severity always surfaces.
 
 #### `LOGR_.labeled` — which label fired
 
@@ -432,12 +459,12 @@ logr_.log(l_.DISCOVERY | l_.CURATED_LISTS, () => ['query...']);
 // with both on                    -> prints:  [DISCOVERY|CURATED_LISTS] query...
 ```
 
-`labeled` is **independent** of `trace`/`prefix` and composes with them — the label goes first, then
-the prefix, then the message, then any trace tag:
+`labeled` is **independent** of `trace`/`name` and composes with them — the label goes first, then
+the unit name, then the message, then any trace tag:
 
 ```javascript
 LOGR.get_instance().labeled = true;
-LOGR.get_instance().prefix('Orchestrator:');
+const logr_ = LOGR_.create({ name: 'Orchestrator', labels: l_array(['DISCOVERY']) });
 // → prints:  [DISCOVERY] Orchestrator: query...
 ```
 

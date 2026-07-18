@@ -1347,7 +1347,6 @@ describe("LOGR(root);", () => {
 
 		afterEach(() => {
 			LOGR_.trace = false; // reset the global flags for other specs
-			LOGR_.prefix();
 			LOGR_.labeled = false;
 		});
 
@@ -1401,27 +1400,83 @@ describe("LOGR(root);", () => {
 			expect(handlerSpy).not.toHaveBeenCalled();
 		});
 
-		it("prefix() prepends a fixed string to fired logs", () => {
-			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+		it("a named logr prepends its name with an implicit colon", () => {
+			const logr_ = LOGR_.create({ name: 'Orchestrator', labels: l_array(['A']) });
 			const l_ = logr_.l;
 			LOGR_.toggle(l_, { A: true });
-			LOGR_.prefix('Orchestrator:');
 
 			logr_.log(l_.A, () => ['msg']);
 			const args = handlerSpy.calls.mostRecent().args;
-			expect(args[0]).toBe('Orchestrator:'); // prepended
+			expect(args[0]).toBe('Orchestrator:'); // name + implicit ':'
 			expect(args[1]).toBe('msg');
+			expect(logr_.name).toBe('Orchestrator'); // name (without colon) is readable
 		});
 
-		it("prefix() with no/empty arg disables it", () => {
+		it("an unnamed logr prints bare (no name prefix)", () => {
 			const logr_ = LOGR_.create({ labels: l_array(['A']) });
 			const l_ = logr_.l;
 			LOGR_.toggle(l_, { A: true });
-			LOGR_.prefix('X:');
-			LOGR_.prefix(); // disable
-
 			logr_.log(l_.A, () => ['msg']);
-			expect(handlerSpy).toHaveBeenCalledWith('msg'); // bare again
+			expect(handlerSpy).toHaveBeenCalledWith('msg');
+		});
+
+		it("mute(name) silences a named unit's log; mute(name, false) restores it", () => {
+			const logr_ = LOGR_.create({ name: 'net', labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, { A: true });
+
+			LOGR_.mute('net');
+			logr_.log(l_.A, () => ['hushed']);
+			expect(handlerSpy).not.toHaveBeenCalled();
+
+			LOGR_.mute('net', false); // un-mute via trailing false
+			logr_.log(l_.A, () => ['back']);
+			expect(handlerSpy).toHaveBeenCalledWith('net:', 'back');
+		});
+
+		it("mute/verbose accept an array or several names, plus a trailing on/off", () => {
+			const logr_a = LOGR_.create({ name: 'unit_a', labels: l_array(['A']) });
+			const logr_b = LOGR_.create({ name: 'unit_b', labels: l_array(['A']) });
+			LOGR_.toggle(logr_a.l, { A: true });
+
+			LOGR_.mute(['unit_a', 'unit_b']); // array
+			logr_a.log(logr_a.l.A, () => ['a']);
+			logr_b.log(logr_b.l.A, () => ['b']);
+			expect(handlerSpy).not.toHaveBeenCalled();
+
+			LOGR_.mute('unit_a', 'unit_b', false); // variadic + trailing false = un-mute both
+			logr_a.log(logr_a.l.A, () => ['a again']);
+			expect(handlerSpy).toHaveBeenCalledWith('unit_a:', 'a again');
+		});
+
+		it("mute reaches a unit by name without holding its logr (through wire)", () => {
+			const logr_leaf = LOGR_.create({ name: 'leaf', labels: l_array(['A']) });
+			const logr_other = LOGR_.create({ labels: l_array(['B']) });
+			const logr_ = LOGR_.wire([logr_other, logr_leaf]); // leaf is buried in the members
+			LOGR_.toggle(logr_.l, { A: true });
+
+			LOGR_.mute('leaf'); // by name -- we don't touch logr_leaf here
+			logr_leaf.log(logr_leaf.l.A, () => ['nope']);
+			expect(handlerSpy).not.toHaveBeenCalled();
+
+			LOGR_.mute('leaf', false);
+		});
+
+		it("verbose(name) forces a named unit fully verbose, ignoring the label mask", () => {
+			const logr_ = LOGR_.create({ name: 'verbose_unit', labels: l_array(['A']) });
+			const l_ = logr_.l;
+			LOGR_.toggle(l_, {}); // nothing toggled
+
+			logr_.log(l_.A, () => ['gated']);
+			expect(handlerSpy).not.toHaveBeenCalled(); // A not toggled -> silent
+
+			LOGR_.verbose('verbose_unit'); // force all of this unit's logs on
+			logr_.log(l_.A, () => ['forced']);
+			expect(handlerSpy).toHaveBeenCalledWith('verbose_unit:', 'forced');
+
+			LOGR_.verbose('verbose_unit', false); // back to label-gated
+			logr_.log(l_.A, () => ['gated again']);
+			expect(handlerSpy).not.toHaveBeenCalledWith('verbose_unit:', 'gated again');
 		});
 
 		it("labeled prepends only the fired label name", () => {
@@ -1446,17 +1501,16 @@ describe("LOGR(root);", () => {
 			expect(handlerSpy.calls.mostRecent().args[0]).toBe('[DISCOVERY|CURATED_LISTS]');
 		});
 
-		it("labeled combines with prefix -- label before prefix", () => {
-			const logr_ = LOGR_.create({ labels: l_array(['DISCOVERY']) });
+		it("labeled combines with the unit name -- label before name", () => {
+			const logr_ = LOGR_.create({ name: 'Orchestrator', labels: l_array(['DISCOVERY']) });
 			const l_ = logr_.l;
 			LOGR_.toggle(l_, { DISCOVERY: true });
 			LOGR_.labeled = true;
-			LOGR_.prefix('Orchestrator:');
 
 			logr_.log(l_.DISCOVERY, () => ['msg']);
 			const args = handlerSpy.calls.mostRecent().args;
 			expect(args[0]).toBe('[DISCOVERY]');   // label first
-			expect(args[1]).toBe('Orchestrator:'); // then prefix
+			expect(args[1]).toBe('Orchestrator:'); // then name
 			expect(args[2]).toBe('msg');
 		});
 
@@ -1572,26 +1626,18 @@ describe("LOGR(root);", () => {
 			expect(handlerSpy.calls.mostRecent().args.pop()).toBe('(log_wrapper_)');
 		});
 
-		it("trace and prefix are mutually exclusive", () => {
-			const logr_ = LOGR_.create({ labels: l_array(['A']) });
+		it("name and trace compose -- name prepended, trace appended", () => {
+			const logr_ = LOGR_.create({ name: 'Unit', labels: l_array(['A']) });
 			const l_ = logr_.l;
 			LOGR_.toggle(l_, { A: true });
-
-			// prefix set, then trace on -> prefix is cleared, trace wins
-			LOGR_.prefix('P:');
 			LOGR_.trace = true;
-			function site_a_() { logr_.log(l_.A, () => ['m']); }
-			site_a_();
-			let args = handlerSpy.calls.mostRecent().args;
-			expect(args[0]).toBe('m');                       // no prefix
-			expect(args[args.length - 1]).toBe('(site_a_)'); // trace tag appended
 
-			// prefix() again -> trace is cleared, prefix wins
-			LOGR_.prefix('P:');
-			logr_.log(l_.A, () => ['m2']);
-			args = handlerSpy.calls.mostRecent().args;
-			expect(args[0]).toBe('P:');                      // prefix prepended
-			expect(args[args.length - 1]).toBe('m2');        // no trace tag
+			function site_nt_() { logr_.log(l_.A, () => ['m']); }
+			site_nt_();
+			const args = handlerSpy.calls.mostRecent().args;
+			expect(args[0]).toBe('Unit:');
+			expect(args[1]).toBe('m');
+			expect(args[args.length - 1]).toBe('(site_nt_)');
 		});
 	});
 
