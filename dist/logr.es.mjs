@@ -1,5 +1,8 @@
 // https://stackoverflow.com/questions/4602141/variable-name-as-a-string-in-javascript
 // console.log('OUT', __name({variableName}) );
+// The single-shared-space label ceiling: bits 0..30 are usable, bit 31 is the sign bit in JS
+// 32-bit bitwise ops. One authoritative representation of the limit (OAOO).
+const k_LABELS_MAX_ = 31;
 //-------------------------------------------------------------------------------------------------
 function l_length_(obj_labels) {
     if (!obj_labels || typeof obj_labels !== 'object')
@@ -109,7 +112,6 @@ function l_merge_(obj_labels1, obj_labels2) {
     return Object.freeze(result);
 }
 function l_union_(...objs_labels) {
-    const k_LABELS_MAX = 31; // bits 0..30 usable; bit 31 is the sign bit in 32-bit ops
     const arr_key = [];
     for (const obj_labels of objs_labels) {
         // reject arrays too: an array of names is l_array_'s job, not a label table
@@ -124,8 +126,8 @@ function l_union_(...objs_labels) {
                 arr_key.push(key); // first-appearance order fixes the bit position
         }
     }
-    if (arr_key.length > k_LABELS_MAX)
-        throw new Error(`l_union: ${arr_key.length} labels exceed the ${k_LABELS_MAX}-bit limit`);
+    if (arr_key.length > k_LABELS_MAX_)
+        throw new Error(`l_union: ${arr_key.length} labels exceed the ${k_LABELS_MAX_}-bit limit`);
     return l_array_(arr_key); // { name: 1 << index }, frozen
 }
 function l_LL_(obj, x) {
@@ -192,6 +194,99 @@ function handler_default_( /* ... */) {
     // https://stackoverflow.com/questions/18746440/passing-multiple-arguments-to-console-log
     var args = Array.prototype.slice.call(arguments);
     console.log.apply(console, args);
+}
+// Defaults for the always-on severity channel (warn/error). Separate from the label/toggle system
+// on purpose: a warning must surface regardless of what is toggled.
+function handler_warn_( /* ... */) {
+    console.warn.apply(console, Array.prototype.slice.call(arguments));
+}
+function handler_error_( /* ... */) {
+    console.error.apply(console, Array.prototype.slice.call(arguments));
+}
+// Best-effort "where did this log happen" tag, the JS analogue of C++ __FUNC__.
+// Uses V8's structured stack (Error.captureStackTrace + a prepareStackTrace hook) to read the
+// caller's Class.method WITHOUT string-parsing. fn_sentinel is the STABLE internal _log_fxn (not the
+// replaceable public log method): captureStackTrace cuts it and every frame above it, so:
+//   - normal case: stack[0] is the log() wrapper (named _logr_log_), stack[1] is the user's call site;
+//   - if the JIT INLINES the wrapper, there is no wrapper frame and stack[0] IS the user.
+// So we skip stack[0] ONLY when it's the wrapper, identified by its distinctive internal name
+// _logr_log_ -- which handles inlining (no skip when absent) AND is immune to a user method named
+// 'log' (its name isn't _logr_log_). Names survive tsc + unminified (dev) bundling; the file:line
+// does NOT (bundle-relative), so only the name is used. Returns '' on non-V8 / unnamed frames.
+//
+// NOTE: swapping Error.prepareStackTrace is a process-global mutation. It is safe only because this
+// runs fully synchronously (no await) on JS's single thread and is restored in finally -- do not make
+// the log path async without revisiting this.
+function _trace_site_(fn_sentinel) {
+    const _cap = Error.captureStackTrace;
+    if (typeof _cap !== 'function')
+        return ''; // non-V8: no structured stack available
+    const _prep = Error.prepareStackTrace;
+    try {
+        Error.prepareStackTrace = (_err, stack) => stack; // hand back raw CallSite[]
+        const holder = {};
+        _cap(holder, fn_sentinel); // omit fn_sentinel (_log_fxn) and every frame above it
+        const stack = holder.stack;
+        if (!stack || !stack.length)
+            return '';
+        // skip the internal log() wrapper frame when present (not inlined), identified by its
+        // distinctive name; if inlined, stack[0] is already the user's frame.
+        let idx = 0;
+        if (stack[0].getFunctionName && stack[0].getFunctionName() === '_logr_log_')
+            idx = 1;
+        const frame = stack[idx];
+        if (!frame)
+            return '';
+        const type = frame.getTypeName ? frame.getTypeName() : null;
+        const fn = frame.getFunctionName ? frame.getFunctionName() : null;
+        if (fn && type && type !== 'Object')
+            return type + '.' + fn; // e.g. Orchestrator._on_curated_query
+        if (fn)
+            return fn; // plain function / object-literal method
+        return frame.getFileName ? frame.getFileName() : '';
+    }
+    catch (e) {
+        return '';
+    }
+    finally {
+        Error.prepareStackTrace = _prep;
+    }
+}
+// The label name(s) that actually FIRED this log, as an ARRAY: the bits present in BOTH the
+// statement's nr_logged and the toggled mask, resolved back to names via the logr's own label
+// table. e.g. log(l_.DISCOVERY | l_.CURATED_LISTS, ...) with only DISCOVERY toggled -> ['DISCOVERY'].
+function _matched_names_(lref, nr_logged, bigint_toggled) {
+    const names = [];
+    if (!lref || typeof lref.get !== 'function')
+        return names;
+    const obj_labels = lref.get();
+    if (!obj_labels)
+        return names;
+    const bigint_matched = BigInt(nr_logged) & bigint_toggled;
+    if (bigint_matched === BigInt(0))
+        return names;
+    // Assumes the normal one-bit-per-name table (what l_array_/l_union_ produce). A hand-built
+    // table where two names share a bit will report both here -- intended, but worth knowing.
+    // Object.keys (own-enumerable) not for..in, to match the codebase's proto-key hygiene.
+    for (const k of Object.keys(obj_labels)) {
+        const v = obj_labels[k];
+        if ((typeof v === 'number' || typeof v === 'bigint') && (BigInt(v) & bigint_matched) !== BigInt(0))
+            names.push(k);
+    }
+    return names;
+}
+// Is a unit's name matched by any entry in a mute/verbose set? An entry is either an exact name or
+// a trailing-'*' prefix pattern -- so hierarchical names ('app:reflector', 'app:db') can be scoped
+// with mute('app:*'), and mute('*') matches everything. Exact names keep the O(1) Set fast path.
+function _name_matched_(name, set_entries) {
+    if (!name || set_entries.size === 0)
+        return false;
+    if (set_entries.has(name))
+        return true; // exact
+    for (const entry of set_entries)
+        if (entry.endsWith('*') && name.startsWith(entry.slice(0, -1)))
+            return true;
+    return false;
 }
 function l_toBigInt_(obj_labels, obj, ignore = false) {
     if (!obj_labels || typeof obj_labels !== 'object')
@@ -315,15 +410,58 @@ const LOGR = (function () {
         const _id = Math.random();
         if (globalThis.LOGR_ENABLED ?? true)
             console.log('creating LOGR instance:', _id);
-        // Private state (replacing constructor properties)
+        // Private state (replacing constructor properties).
         let _Bint_toggled = BigInt(0);
         let _handler_log = handler_default_;
+        let _handler_warn = handler_warn_; // always-on severity channel, independent of _Bint_toggled
+        let _handler_error = handler_error_;
+        let _trace = false;
+        let _labeled = false;
+        // per-unit scope, keyed by each logr's own name (create({ name })):
+        const _muted_names = new Set(); // named units silenced (log suppressed)
+        const _verbose_names = new Set(); // named units forced fully verbose (fire regardless of toggle)
+        // Append the call site "(site)" to args when trace is on -- the ONLY decoration shared by
+        // log/warn/error. fn_sentinel is the stable internal function on the calling path so
+        // _trace_site_ cuts to the user's frame. (name/label are log-only, handled in _log_fxn.)
+        function _trace_wrap_(args, fn_sentinel) {
+            if (!_trace)
+                return args;
+            const site = _trace_site_(fn_sentinel);
+            if (!site)
+                return args;
+            const tag = (typeof _trace === 'function') ? _trace(site) : `(${site})`;
+            return [...args, tag]; // call site APPENDED after the message
+        }
         function _log_fxn(nr_logged, argsFn /* args */) {
-            // console.log('_log_fxn: ', BigInt(nr_logged), _Bint_toggled, (BigInt(nr_logged) & _Bint_toggled));
-            if ((BigInt(nr_logged) & _Bint_toggled) === BigInt(0))
+            // per-unit scope (by this logr's name, exact or 'app:*' wildcard): a muted unit is
+            // silent; a forced-verbose unit fires regardless of the toggle mask.
+            if (_name_matched_(this._name, _muted_names))
+                return;
+            const matched = (BigInt(nr_logged) & _Bint_toggled) !== BigInt(0);
+            if (!matched && !_name_matched_(this._name, _verbose_names))
                 return;
             const args = argsFn();
-            _handler_log.apply(this, args);
+            // output shape:  [label?] name: ...message [trace?]
+            // label (which label fired) and the unit name are prepended; trace is appended.
+            // All dev-only; trace pays a stack read on FIRED logs only.
+            const lead = [];
+            if (_labeled) {
+                const names = _matched_names_(this._lref_labels, nr_logged, _Bint_toggled);
+                if (names.length) {
+                    // true -> "[DISCOVERY]"; a function -> your policy over the names array
+                    const tag = (typeof _labeled === 'function') ? _labeled(names) : '[' + names.join('|') + ']';
+                    if (tag)
+                        lead.push(tag); // BEFORE the name
+                }
+            }
+            if (this._name)
+                lead.push(this._name + ':'); // the ':' is implicit -- the name itself doesn't carry it
+            // trace (the call-site tag) is the one bit shared with warn/error -> one impl in _trace_wrap_
+            const tail = _trace_wrap_(args, _log_fxn);
+            if (lead.length)
+                _handler_log.apply(this, [...lead, ...tail]);
+            else
+                _handler_log.apply(this, tail);
         }
         return {
             _id, // for testing
@@ -331,15 +469,61 @@ const LOGR = (function () {
             set handler(fx) {
                 _handler_log = fx;
             },
+            // Handlers for the always-on severity channel (logr_.warn / logr_.error), default
+            // console.warn / console.error. Overridable like handler.
+            get handler_warn() { return _handler_warn; },
+            set handler_warn(fx) {
+                _handler_warn = fx;
+            },
+            get handler_error() { return _handler_error; },
+            set handler_error(fx) {
+                _handler_error = fx;
+            },
+            // Append each FIRED log with its call site (Class.method), the JS analogue of __FUNC__.
+            // false (default) = off; true = append the site as "(site)"; a function = format it, e.g.
+            // LOGR_.trace = (site) => `[${site}]`. Only costs a stack read on logs that fire (dev only).
+            get trace() { return _trace; },
+            set trace(v) {
+                _trace = v;
+            },
+            // Prepend each FIRED log with the label name(s) that fired it (the bits present in
+            // BOTH the statement and the toggled mask). false = off; true = "[NAME|NAME]"; a
+            // function (names: string[]) => string owns the whole tag (abbreviate, re-order,
+            // bracket, or return '' to suppress). Independent of trace/name -- the label goes first.
+            get labeled() { return _labeled; },
+            set labeled(v) {
+                _labeled = v;
+            },
+            // Per-unit scope, addressed by a logr's own name (create({ name })) -- so it reaches a
+            // unit buried under wire() without holding its logr. Two axes, both keyed by name:
+            //   mute    -- silence a unit's log output (warn/error exempt);
+            //   verbose -- force a unit to fire ALL its logs regardless of the label mask (scoped to it).
+            // Each takes one name, several, or an array, plus an optional trailing on/off (default true):
+            //   mute('a'), mute('a','b'), mute(['a','b']), mute('a', false) to un-mute.
+            // A name may be a trailing-'*' wildcard over hierarchical names: mute('app:*'), mute('*').
+            mute(...args) {
+                const on = (typeof args[args.length - 1] === 'boolean') ? args.pop() : true;
+                for (const n of args.flat())
+                    if (on)
+                        _muted_names.add(n);
+                    else
+                        _muted_names.delete(n);
+            },
+            verbose(...args) {
+                const on = (typeof args[args.length - 1] === 'boolean') ? args.pop() : true;
+                for (const n of args.flat())
+                    if (on)
+                        _verbose_names.add(n);
+                    else
+                        _verbose_names.delete(n);
+            },
             get toggled() { return _Bint_toggled; },
-            // toggle(obj_labels, obj_toggled) {
-            // 	_Bint_toggled= l_toBigInt_(obj_labels, obj_toggled);
-            // },
+            // toggle the global label mask (which categories fire). For per-unit control use
+            // mute/verbose above -- not this.
             toggle(labels, obj_toggled) {
                 const obj_labels = typeof labels?.get === 'function'
                     ? labels.get()
                     : labels;
-                // console.log('obj_labels', obj_labels)
                 _Bint_toggled = l_toBigInt_(obj_labels, obj_toggled);
             },
             // Core internal log function (exposed only to created loggers)
@@ -351,9 +535,15 @@ const LOGR = (function () {
                         _obj_labels: undefined, // optional: keep shape compatible if needed
                         log: () => { }, // does nothing
                         raw: () => { }, // does nothing
+                        // severity is NOT stripped in production -- warnings/errors must still surface
+                        warn(...args) { _handler_warn.apply(this, args); },
+                        error(...args) { _handler_error.apply(this, args); },
                     };
                 }
                 const _logger = {
+                    // the unit's name (create({ name })): its display prefix AND its mute/toggle identity.
+                    _name: options.name,
+                    get name() { return this._name; },
                     // _lref_labels: (options.arr_labels === undefined) ? undefined : lRef( l_array_(options.arr_labels) ),
                     _lref_labels: (options.labels === undefined)
                         ? undefined
@@ -368,7 +558,10 @@ const LOGR = (function () {
                     set lref(lref_labels_new) {
                         this._lref_labels = lref_labels_new;
                     },
-                    log(nr_logged, argsFn) {
+                    // named _logr_log_ (a distinctive internal name, not the collision-prone 'log') so
+                    // _trace_site_ can identify this wrapper frame without mistaking a user method
+                    // that happens to be named 'log'. Public property is still 'log'.
+                    log: function _logr_log_(nr_logged, argsFn) {
                         // This constant will be replaced at build time
                         if (!(globalThis.LOGR_ENABLED ?? true))
                             return;
@@ -377,6 +570,16 @@ const LOGR = (function () {
                     // Optional shorthand for common cases
                     raw(...args) {
                         _handler_log.apply(this, args);
+                    },
+                    // Always-on severity channel: fires regardless of the toggle mask (a warning must
+                    // not be silenceable by forgetting to toggle a label). Orthogonal to the label system.
+                    // Named function expressions so each can pass ITSELF as the trace sentinel, giving
+                    // warn/error the same call-site tag as log when trace is on.
+                    warn: function _logr_warn_(...args) {
+                        _handler_warn.apply(this, _trace_wrap_(args, _logr_warn_));
+                    },
+                    error: function _logr_error_(...args) {
+                        _handler_error.apply(this, _trace_wrap_(args, _logr_error_));
                     }
                 };
                 return _logger;
@@ -412,11 +615,13 @@ const LOGR = (function () {
                     throw new Error('wire: unioned labels do not match pinned positions\n'
                         + JSON.stringify(obj_labels_, null, 2));
                 const lref_ = lRef(obj_labels_);
-                for (const member of arr_members)
-                    member.lref = lref_; // re-point every member (leaves included) at the shared ref
+                // Build the main logr FIRST -- create() is the last fallible step; do it before
+                // mutating any member .lref, so a throw can't leave members half-repointed.
                 const logr_ = this.create(); // no labels -> _lref_labels undefined
                 logr_.lref = lref_; // main logr on the same shared ref
                 logr_._arr_members = [...arr_members, logr_]; // remember, so a parent wire() can follow
+                for (const member of arr_members)
+                    member.lref = lref_; // re-point every member (leaves included) at the shared ref -- MUTATION LAST
                 return logr_;
             },
         };
